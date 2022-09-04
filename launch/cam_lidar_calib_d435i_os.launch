@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+
+  <param name ="/use_sim_time" value="true"/>
+
+  <node  pkg="cam_lidar_calib" name="cam_lidar_calib_basler" type="cam_lidar_calib_node" output="screen">
+    
+    <param name = "dx" type="double" value="0.035"/>
+    <param name = "dy" type="double" value="0.035"/>
+
+    <param name = "checkerboard_rows" type = "int" value = "9" />
+    <param name = "checkerboard_cols" type = "int" value = "6" />
+
+    <param name = "result_file" type="string" value="$(find cam_lidar_calib)/result/C_T_L_d435i.txt"/>
+    <param name = "result_rpy_file" type="string" value="$(find cam_lidar_calib)/result/rpy_txyz_d435i.txt"/>
+
+    <param name = "min_points_on_plane" type="int" value="450"/>
+    <param name = "num_views" type="int" value="10"/>
+
+    <param name = "camera_in_topic" type="string" value="/multijackal_01/d435i_2/color/image_raw"/>
+    <param name = "lidar_in_topic" type="string" value="/multijackal_01/velodyne_points"/>
+
+    <param name = "cam_config_file_path" type="string" value="$(find cam_lidar_calib)/config/d435i_config.yaml" />
+
+    <param name="x_min" value="0.75"/>
+    <param name="x_max" value="6"/>
+    <param name="y_min" value="-2"/>
+    <param name="y_max" value="2"/>
+    <param name="z_min" value="-1"/>
+    <param name="z_max" value="3"/>
+    <param name="ransac_threshold" value="0.01"/>
+
+    <param name = "no_of_initializations" type="int" value="1"/>
+    <param name = "initializations_file" value="/home/subodh/catkin_ws/src/camera_lidar_calibration/calibration/debug_data/results/methodA/left_vlp/random_init.txt"/>
+
+  </node>
+</launch>
