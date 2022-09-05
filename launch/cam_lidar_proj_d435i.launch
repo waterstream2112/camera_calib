@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
-  <param name ="/use_sim_time" value="true"/>
+  <param name ="/use_sim_time" value="false"/>
 
-  <param name = "result_file" type="string" value="$(find cam_lidar_calib)/result/C_T_L_d435i.txt"/>
+  <param name = "result_file" type="string" value="$(find camera_calib)/results/C_T_L_d435i.txt"/>
 
   <param name= "project_only_plane" type="bool" value="false"/>
 
@@ -12,9 +12,9 @@
   
   <param name = "dist_cut_off" type="int" value="5"/>
 
-  <param name = "cam_config_file_path" type="string" value="$(find cam_lidar_calib)/config/d435i_config.yaml" />
+  <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/d435i_config.yaml" />
 
-  <node  pkg="cam_lidar_calib" name="cam_lidar_proj_d435i" type="cam_lidar_proj_node" output="screen">
+  <node  pkg="camera_calib" name="cam_lidar_proj_d435i" type="cam_lidar_proj_node" output="screen">
 
   </node>
 </launch>

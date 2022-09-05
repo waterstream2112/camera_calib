@@ -102,11 +102,14 @@ public:
         lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
         dist_cut_off = readParam<int>(nh, "dist_cut_off");
         camera_name = readParam<std::string>(nh, "camera_name");
+
+        std::string lidarOutTopic = camera_in_topic + "/velodyne_out_cloud";
+        std::string imageOutTopic = camera_in_topic + "/projected_image";
+
         cloud_sub =  new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
         image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
-        std::string lidarOutTopic = camera_in_topic + "/velodyne_out_cloud";
+        
         cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
-        std::string imageOutTopic = camera_in_topic + "/projected_image";
         image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
 
         sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
@@ -297,10 +300,12 @@ public:
     void callback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg,
                   const sensor_msgs::ImageConstPtr &image_msg) {
         lidar_frameId = cloud_msg->header.frame_id;
+
         objectPoints_L.clear();
         objectPoints_C.clear();
         imagePoints.clear();
         publishTransforms();
+        
         image_in = cv_bridge::toCvShare(image_msg, "bgr8")->image;
 
 

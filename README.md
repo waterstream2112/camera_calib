@@ -1,5 +1,17 @@
 
+### Intrinsic calibration
 rosrun camera_calibration cameracalibrator.py --no-service-check --size 9x6 --square 0.035 image:=/multijackal_01/d435i_2/color/image_raw camera:=/multijackal_01
+
+### Launch the Procyon
+roslaunch autonomous_robots_2 handheld_mapping_setup.launch
+
+### Extrinsic calibration
+roslaunch camera_calib cam_lidar_calib_d435i.launch
+
+### Run projection
+roslaunch camera_calib cam_lidar_proj_d435i.launch
+rosrun tf static_transform_publisher 0 0 0 0 0 0 1 map multijackal_01 10
+rosrun rviz rviz -f multijackal_01 -d `rospack find camera_calib`/draconis.rviz
 
 # 
 D = [0.20368984736396123, -0.5017791816281467, 0.00437797647196533, -0.0017745008471770705, 0.0]

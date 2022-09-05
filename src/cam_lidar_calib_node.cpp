@@ -64,7 +64,9 @@ private:
     message_filters::Subscriber<sensor_msgs::PointCloud2> *cloud_sub;
     message_filters::Subscriber<sensor_msgs::Image> *image_sub;
     message_filters::Synchronizer<SyncPolicy> *sync;
-    ros::Publisher cloud_pub;
+
+    ros::Publisher filtered_cloud_pub;
+    ros::Publisher plane_cloud_pub;
 
     cv::Mat image_in;
     cv::Mat image_resized;
@@ -119,7 +121,10 @@ public:
         image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
         sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
         sync->registerCallback(boost::bind(&camLidarCalib::callback, this, _1, _2));
-        cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("points_out", 1);
+
+        filtered_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("filtered_cloud_out", 1);
+        plane_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("plane_cloud_out", 1);
+
         projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
         distCoeff = cv::Mat::zeros(5, 1, CV_64F);
         boardDetectedInCam = false;
@@ -281,8 +286,8 @@ public:
         /// Statistical Outlier Removal
         pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
         sor.setInputCloud(plane);
-        sor.setMeanK (50);
-        sor.setStddevMulThresh (1);
+        sor.setMeanK(50);
+        sor.setStddevMulThresh(1);
         sor.filter (*plane_filtered);
 
         /// Store the points lying in the filtered plane in a vector
@@ -293,13 +298,25 @@ public:
             double Z = plane_filtered->points[i].z;
             lidar_points.push_back(Eigen::Vector3d(X, Y, Z));
         }
-//        ROS_INFO_STREAM("No of planar_pts: " << lidar_points.size());
+
         ROS_WARN_STREAM("No of planar_pts: " << plane_filtered->points.size());
-//        sensor_msgs::PointCloud2 out_cloud;
-//        pcl::toROSMsg(*plane_filtered, out_cloud);
-//        out_cloud.header.frame_id = cloud_msg->header.frame_id;
-//        out_cloud.header.stamp = cloud_msg->header.stamp;
-//        cloud_pub.publish(out_cloud);
+
+        //--- Publish the filtered cloud so can see on rviz
+
+        sensor_msgs::PointCloud2 out_filtered_cloud;
+        pcl::toROSMsg(*cloud_filtered_z, out_filtered_cloud);
+        out_filtered_cloud.header.frame_id = cloud_msg->header.frame_id;
+        out_filtered_cloud.header.stamp = cloud_msg->header.stamp;
+        filtered_cloud_pub.publish(out_filtered_cloud);
+
+
+        //--- Publish the plane cloud so can see on rviz
+
+        sensor_msgs::PointCloud2 out_plane_cloud;
+        pcl::toROSMsg(*plane_filtered, out_plane_cloud);
+        out_plane_cloud.header.frame_id = cloud_msg->header.frame_id;
+        out_plane_cloud.header.stamp = cloud_msg->header.stamp;
+        plane_cloud_pub.publish(out_plane_cloud);
     }
 
     void imageHandler(const sensor_msgs::ImageConstPtr &image_msg) {
@@ -310,16 +327,16 @@ public:
                                                            image_points,
                                                            cv::CALIB_CB_ADAPTIVE_THRESH+
                                                            cv::CALIB_CB_NORMALIZE_IMAGE);
-            cv::drawChessboardCorners(image_in,
-                                      cv::Size(checkerboard_cols, checkerboard_rows),
-                                      image_points,
-                                      boardDetectedInCam);
+            // cv::drawChessboardCorners(image_in,
+            //                           cv::Size(checkerboard_cols, checkerboard_rows),
+            //                           image_points,
+            //                           boardDetectedInCam);
             if(image_points.size() == object_points.size()){
                 cv::solvePnP(object_points, image_points, projection_matrix, distCoeff, rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
                 projected_points.clear();
                 cv::projectPoints(object_points, rvec, tvec, projection_matrix, distCoeff, projected_points, cv::noArray());
                 for(int i = 0; i < projected_points.size(); i++){
-                    cv::circle(image_in, projected_points[i], 16, cv::Scalar(0, 255, 0), 10, cv::LINE_AA, 0);
+                    cv::circle(image_in, projected_points[i], 3, cv::Scalar(0, 255, 0), 1, cv::LINE_AA, 0);
                 }
                 cv::Rodrigues(rvec, C_R_W);
                 cv::cv2eigen(C_R_W, c_R_w);
@@ -492,6 +509,7 @@ public:
 };
 
 int main(int argc, char** argv) {
+    ROS_INFO_STREAM("Start Camera Lidar Calibration!");
     ros::init(argc, argv, "CameraLidarCalib_node");
     ros::NodeHandle nh("~");
     camLidarCalib cLC(nh);
