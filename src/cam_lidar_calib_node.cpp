@@ -65,8 +65,17 @@ private:
     message_filters::Subscriber<sensor_msgs::Image> *image_sub;
     message_filters::Synchronizer<SyncPolicy> *sync;
 
+    ros::Subscriber imageSub;
+    ros::Subscriber cloudSub;
+
     ros::Publisher filtered_cloud_pub;
     ros::Publisher plane_cloud_pub;
+
+    sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
+    sensor_msgs::ImageConstPtr imageMsgPtr;
+
+    ros::Duration samplingDuration;
+    ros::Time prevCycleTime;
 
     cv::Mat image_in;
     cv::Mat image_resized;
@@ -120,7 +129,14 @@ public:
         cloud_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
         image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
         sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
+        sync->setMaxIntervalDuration(ros::Duration(10.0));
         sync->registerCallback(boost::bind(&camLidarCalib::callback, this, _1, _2));
+
+        imageSub = n.subscribe(camera_in_topic, 5, &camLidarCalib::imageCallback, this);
+        cloudSub = n.subscribe(lidar_in_topic, 5, &camLidarCalib::cloudCallback, this);
+
+        samplingDuration = ros::Duration(0.5);  // in sec
+        prevCycleTime = ros::Time(1);
 
         filtered_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("filtered_cloud_out", 1);
         plane_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("plane_cloud_out", 1);
@@ -502,9 +518,36 @@ public:
 
     void callback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg,
                   const sensor_msgs::ImageConstPtr &image_msg) {
+        // ROS_INFO("Hi");
+        // imageHandler(image_msg);
+        // cloudHandler(cloud_msg);
+        // runSolver();
+    }
+
+    void imageCallback(const sensor_msgs::ImageConstPtr &image_msg)
+    {
+        // ROS_INFO("image %0.2f", image_msg->header.stamp.toSec());
+
+        ros::Duration period = ros::Time::now() - prevCycleTime;
+
+        if (period < samplingDuration)
+            return;
+
+        prevCycleTime = ros::Time::now();
+
+
+        if (cloudMsgPtr == NULL)
+            return;
+
         imageHandler(image_msg);
-        cloudHandler(cloud_msg);
+        cloudHandler(cloudMsgPtr);
         runSolver();
+    }
+
+    void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
+    {
+        // ROS_INFO("cloud %0.2f", cloud_msg->header.stamp.toSec());
+        cloudMsgPtr = cloud_msg;
     }
 };
 
