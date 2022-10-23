@@ -12,6 +12,7 @@
 #include "sensor_msgs/PointCloud2.h"
 #include "sensor_msgs/CameraInfo.h"
 #include "sensor_msgs/Image.h"
+#include "draconis_demo_custom_msgs/ImagePointcloudMsg.h"
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -65,14 +66,17 @@ private:
     message_filters::Subscriber<sensor_msgs::Image> *image_sub;
     message_filters::Synchronizer<SyncPolicy> *sync;
 
-    ros::Subscriber imageSub;
-    ros::Subscriber cloudSub;
+    // ros::Subscriber imageSub;
+    // ros::Subscriber cloudSub;
+    ros::Subscriber imageAndCloudSub;
 
     ros::Publisher filtered_cloud_pub;
     ros::Publisher plane_cloud_pub;
 
     sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
     sensor_msgs::ImageConstPtr imageMsgPtr;
+
+    
 
     ros::Duration samplingDuration;
     ros::Time prevCycleTime;
@@ -107,6 +111,7 @@ private:
 
     std::string camera_in_topic;
     std::string lidar_in_topic;
+    std::string image_and_cloud_in_topic;
 
     int num_views;
 
@@ -125,6 +130,7 @@ public:
         nh = n;
         camera_in_topic = readParam<std::string>(nh, "camera_in_topic");
         lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
+        image_and_cloud_in_topic = readParam<std::string>(nh, "image_and_cloud_in_topic");
 
         cloud_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
         image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
@@ -132,8 +138,9 @@ public:
         sync->setMaxIntervalDuration(ros::Duration(10.0));
         sync->registerCallback(boost::bind(&camLidarCalib::callback, this, _1, _2));
 
-        imageSub = n.subscribe(camera_in_topic, 5, &camLidarCalib::imageCallback, this);
-        cloudSub = n.subscribe(lidar_in_topic, 5, &camLidarCalib::cloudCallback, this);
+        // imageSub = n.subscribe(camera_in_topic, 5, &camLidarCalib::imageCallback, this);
+        // cloudSub = n.subscribe(lidar_in_topic, 5, &camLidarCalib::cloudCallback, this);
+        imageAndCloudSub = n.subscribe(image_and_cloud_in_topic, 5, &camLidarCalib::imageAndCloudCallback, this);
 
         samplingDuration = ros::Duration(0.5);  // in sec
         prevCycleTime = ros::Time(1);
@@ -176,6 +183,7 @@ public:
         y_max = readParam<double>(nh, "y_max");
         z_min = readParam<double>(nh, "z_min");
         z_max = readParam<double>(nh, "z_max");
+
         ransac_threshold = readParam<double>(nh, "ransac_threshold");
     }
 
@@ -259,10 +267,10 @@ public:
         transformation = transformation*trans_noise;
     }
 
-    void cloudHandler(const sensor_msgs::PointCloud2ConstPtr &cloud_msg) {
+    void cloudHandler(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
 
         pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::fromROSMsg(*cloud_msg, *in_cloud);
+        pcl::fromROSMsg(msg->pointcloud, *in_cloud);
 
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_x(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_y(new pcl::PointCloud<pcl::PointXYZ>);
@@ -321,8 +329,8 @@ public:
 
         sensor_msgs::PointCloud2 out_filtered_cloud;
         pcl::toROSMsg(*cloud_filtered_z, out_filtered_cloud);
-        out_filtered_cloud.header.frame_id = cloud_msg->header.frame_id;
-        out_filtered_cloud.header.stamp = cloud_msg->header.stamp;
+        out_filtered_cloud.header.frame_id = msg->header.frame_id;
+        out_filtered_cloud.header.stamp = msg->header.stamp;
         filtered_cloud_pub.publish(out_filtered_cloud);
 
 
@@ -330,14 +338,15 @@ public:
 
         sensor_msgs::PointCloud2 out_plane_cloud;
         pcl::toROSMsg(*plane_filtered, out_plane_cloud);
-        out_plane_cloud.header.frame_id = cloud_msg->header.frame_id;
-        out_plane_cloud.header.stamp = cloud_msg->header.stamp;
+        out_plane_cloud.header.frame_id = msg->header.frame_id;
+        out_plane_cloud.header.stamp = msg->header.stamp;
         plane_cloud_pub.publish(out_plane_cloud);
     }
 
-    void imageHandler(const sensor_msgs::ImageConstPtr &image_msg) {
+    void imageHandler(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
         try {
-            image_in = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+            boost::shared_ptr<void const> tracked_object;
+            image_in = cv_bridge::toCvShare(msg->image, tracked_object, "bgr8")->image;
             boardDetectedInCam = cv::findChessboardCorners(image_in,
                                                            cv::Size(checkerboard_cols, checkerboard_rows),
                                                            image_points,
@@ -368,7 +377,7 @@ public:
             cv::waitKey(10);
         } catch (cv_bridge::Exception& e) {
             ROS_ERROR("Could not convert from '%s' to 'bgr8'.",
-                      image_msg->encoding.c_str());
+                      msg->image.encoding.c_str());
         }
     }
 
@@ -517,37 +526,46 @@ public:
     }
 
     void callback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg,
-                  const sensor_msgs::ImageConstPtr &image_msg) {
+                  const sensor_msgs::ImageConstPtr &image_msg) 
+    {
         // ROS_INFO("Hi");
         // imageHandler(image_msg);
         // cloudHandler(cloud_msg);
         // runSolver();
     }
 
+    void imageAndCloudCallback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
+    {
+        ROS_INFO("Hi");
+        imageHandler(msg);
+        cloudHandler(msg);
+        runSolver();
+    }
+
     void imageCallback(const sensor_msgs::ImageConstPtr &image_msg)
     {
         // ROS_INFO("image %0.2f", image_msg->header.stamp.toSec());
 
-        ros::Duration period = ros::Time::now() - prevCycleTime;
+        // ros::Duration period = ros::Time::now() - prevCycleTime;
 
-        if (period < samplingDuration)
-            return;
+        // if (period < samplingDuration)
+        //     return;
 
-        prevCycleTime = ros::Time::now();
+        // prevCycleTime = ros::Time::now();
 
 
-        if (cloudMsgPtr == NULL)
-            return;
+        // if (cloudMsgPtr == NULL)
+        //     return;
 
-        imageHandler(image_msg);
-        cloudHandler(cloudMsgPtr);
-        runSolver();
+        // imageHandler(image_msg);
+        // cloudHandler(cloudMsgPtr);
+        // runSolver();
     }
 
     void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
     {
         // ROS_INFO("cloud %0.2f", cloud_msg->header.stamp.toSec());
-        cloudMsgPtr = cloud_msg;
+        // cloudMsgPtr = cloud_msg;
     }
 };
 

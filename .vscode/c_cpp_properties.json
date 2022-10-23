@@ -4,6 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
+                "/home/nghiaho/Draconis/catkin_ws/devel/include",
                 "/opt/ros/noetic/include",
                 "/usr/include/opencv4",
                 "/usr/include/pcl-1.10",

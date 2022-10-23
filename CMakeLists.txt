@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   sensor_msgs
+  draconis_demo_custom_msgs
   pcl_conversions
   pcl_ros
   message_filters
@@ -128,6 +129,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
   include
+  # devel/include
   ${catkin_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}

@@ -6,6 +6,8 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CameraInfo.h>
+#include "draconis_demo_custom_msgs/ImagePointcloudMsg.h"
+
 #include <tf/transform_listener.h>
 #include <image_transport/image_transport.h>
 #include <opencv2/highgui/highgui.hpp>
@@ -57,18 +59,19 @@ private:
 
     ros::NodeHandle nh;
 
-    message_filters::Subscriber<sensor_msgs::PointCloud2> *cloud_sub;
-    message_filters::Subscriber<sensor_msgs::Image> *image_sub;
-    message_filters::Synchronizer<SyncPolicy> *sync;
+    // message_filters::Subscriber<sensor_msgs::PointCloud2> *cloud_sub;
+    // message_filters::Subscriber<sensor_msgs::Image> *image_sub;
+    // message_filters::Synchronizer<SyncPolicy> *sync;
 
-    ros::Subscriber imageSub;
-    ros::Subscriber cloudSub;
+    // ros::Subscriber imageSub;
+    // ros::Subscriber cloudSub;
+    ros::Subscriber imageAndCloudSub;
 
     ros::Publisher cloud_pub;
     ros::Publisher image_pub;
 
-    sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
-    sensor_msgs::ImageConstPtr imageMsgPtr;
+    // sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
+    // sensor_msgs::ImageConstPtr imageMsgPtr;
 
     ros::Duration samplingDuration;
     ros::Time prevCycleTime;
@@ -92,8 +95,9 @@ private:
 
     std::string lidar_frameId;
 
-    std::string camera_in_topic;
-    std::string lidar_in_topic;
+    // std::string camera_in_topic;
+    // std::string lidar_in_topic;
+    std::string image_and_cloud_in_topic;
 
     pcl::PointCloud<pcl::PointXYZRGB> out_cloud_pcl;
     cv::Mat image_in;
@@ -107,25 +111,28 @@ private:
 
 public:
     lidarImageProjection() {
-        camera_in_topic = readParam<std::string>(nh, "camera_in_topic");
-        lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
+        // camera_in_topic = readParam<std::string>(nh, "camera_in_topic");
+        // lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
+        image_and_cloud_in_topic = readParam<std::string>(nh, "image_and_cloud_in_topic");
         dist_cut_off = readParam<int>(nh, "dist_cut_off");
         camera_name = readParam<std::string>(nh, "camera_name");
 
-        std::string lidarOutTopic = camera_in_topic + "/velodyne_out_cloud";
-        std::string imageOutTopic = camera_in_topic + "/projected_image";
+        std::string lidarOutTopic = "/velodyne_out_cloud";
+        std::string imageOutTopic = "/projected_image";
 
-        cloud_sub =  new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
-        image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
+        // cloud_sub =  new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
+        // image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
         
-        cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
-        image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
+        // cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
+        // image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
 
-        sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
+        // sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
         // sync->registerCallback(boost::bind(&lidarImageProjection::callback, this, _1, _2));
 
-        imageSub = nh.subscribe(camera_in_topic, 5, &lidarImageProjection::imageCallback, this);
-        cloudSub = nh.subscribe(lidar_in_topic, 5, &lidarImageProjection::cloudCallback, this);
+        // imageSub = nh.subscribe(camera_in_topic, 5, &lidarImageProjection::imageCallback, this);
+        // cloudSub = nh.subscribe(lidar_in_topic, 5, &lidarImageProjection::cloudCallback, this);
+        imageAndCloudSub = nh.subscribe(image_and_cloud_in_topic, 5, &lidarImageProjection::imageAndCloudCallback, this);
+
 
         samplingDuration = ros::Duration(0.2);  // in sec
         prevCycleTime = ros::Time(1);
@@ -207,10 +214,10 @@ public:
         return ans;
     }
 
-    pcl::PointCloud<pcl::PointXYZ >::Ptr planeFilter(const sensor_msgs::PointCloud2ConstPtr &cloud_msg) {
+    pcl::PointCloud<pcl::PointXYZ >::Ptr planeFilter(sensor_msgs::PointCloud2 &cloud_msg) {
 
         pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::fromROSMsg(*cloud_msg, *in_cloud);
+        pcl::fromROSMsg(cloud_msg, *in_cloud);
 
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_x(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_y(new pcl::PointCloud<pcl::PointXYZ>);
@@ -312,17 +319,20 @@ public:
         }
     }
 
-    void callback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg,
-                  const sensor_msgs::ImageConstPtr &image_msg) {
+    void callback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
 
-        lidar_frameId = cloud_msg->header.frame_id;
+        sensor_msgs::PointCloud2 cloud_msg = msg->pointcloud;
+        sensor_msgs::Image image_msg = msg->image;
+
+        lidar_frameId = cloud_msg.header.frame_id;
 
         objectPoints_L.clear();
         objectPoints_C.clear();
         imagePoints.clear();
         publishTransforms();
         
-        image_in = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+        boost::shared_ptr<void const> tracked_object;
+        image_in = cv_bridge::toCvShare(image_msg, tracked_object, "bgr8")->image;
 
 
         double fov_x, fov_y;
@@ -342,7 +352,7 @@ public:
             cv::projectPoints(objectPoints_L, rvec, tvec, projection_matrix, distCoeff, imagePoints, cv::noArray());
         } else {
             pcl::PCLPointCloud2 *cloud_in = new pcl::PCLPointCloud2;
-            pcl_conversions::toPCL(*cloud_msg, *cloud_in);
+            pcl_conversions::toPCL(cloud_msg, *cloud_in);
             pcl::fromPCLPointCloud2(*cloud_in, *in_cloud);
 
             for(size_t i = 0; i < in_cloud->points.size(); i++) {
@@ -392,17 +402,17 @@ public:
         colorPointCloud();
 
         pcl::toROSMsg(out_cloud_pcl, out_cloud_ros);
-        out_cloud_ros.header.frame_id = cloud_msg->header.frame_id;
-        out_cloud_ros.header.stamp = cloud_msg->header.stamp;
+        out_cloud_ros.header.frame_id = cloud_msg.header.frame_id;
+        out_cloud_ros.header.stamp = cloud_msg.header.stamp;
 
         cloud_pub.publish(out_cloud_ros);
 
         /// Color Lidar Points on the image a/c to distance
         colorLidarPointsOnImage(min_range, max_range);
 
-        sensor_msgs::ImagePtr msg =
+        sensor_msgs::ImagePtr out_msg =
                 cv_bridge::CvImage(std_msgs::Header(), "bgr8", image_in).toImageMsg();
-        image_pub.publish(msg);
+        image_pub.publish(out_msg);
 //        cv::Mat image_resized;
 //        cv::resize(lidarPtsImg, image_resized, cv::Size(), 0.25, 0.25);
 //        cv::imshow("view", image_resized);
@@ -410,28 +420,42 @@ public:
     }
 
 
+    void imageAndCloudCallback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
+    {
+        ROS_INFO("Hi");
+        callback(msg);
+    }
+
     void imageCallback(const sensor_msgs::ImageConstPtr &image_msg)
     {
         // ROS_INFO("image %0.2f", image_msg->header.stamp.toSec());
 
-        ros::Duration period = ros::Time::now() - prevCycleTime;
+        // ros::Duration period = ros::Time::now() - prevCycleTime;
 
-        if (period < samplingDuration)
-            return;
+        // if (period < samplingDuration)
+        //     return;
 
-        prevCycleTime = ros::Time::now();
+        // prevCycleTime = ros::Time::now();
 
 
-        if (cloudMsgPtr == NULL)
-            return;
+        // if (cloudMsgPtr == NULL)
+        //     return;
 
-        callback(cloudMsgPtr, image_msg);
+        // ros::Duration timeDiff = image_msg->header.stamp - cloudMsgPtr->header.stamp;
+        // ROS_INFO("timeDiff %0.3f", timeDiff.toSec());
+
+        // ROS_INFO("image %0.3f", (ros::Time::now() - image_msg->header.stamp).toSec());
+        // ROS_INFO("cloud %0.3f", (ros::Time::now() - cloudMsgPtr->header.stamp).toSec());
+
+        // callback(cloudMsgPtr, image_msg);
     }
 
     void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
     {
         // ROS_INFO("cloud %0.2f", cloud_msg->header.stamp.toSec());
-        cloudMsgPtr = cloud_msg;
+        // cloudMsgPtr = cloud_msg;
+
+        // ROS_INFO("cloudCallback %0.3f", (ros::Time::now() - cloudMsgPtr->header.stamp).toSec());
     }
 };
 
