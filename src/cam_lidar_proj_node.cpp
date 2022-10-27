@@ -123,8 +123,8 @@ public:
         // cloud_sub =  new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
         // image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
         
-        // cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
-        // image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
+        cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
+        image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
 
         // sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
         // sync->registerCallback(boost::bind(&lidarImageProjection::callback, this, _1, _2));
@@ -422,7 +422,7 @@ public:
 
     void imageAndCloudCallback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
     {
-        ROS_INFO("Hi");
+        // ROS_INFO("Hi");
         callback(msg);
     }
 

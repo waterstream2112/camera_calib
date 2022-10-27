@@ -3,10 +3,11 @@
 
   <param name ="/use_sim_time" value="false"/>
 
-  <node  pkg="camera_calib" name="camera_calib" type="cam_lidar_calib_node" output="screen">
+  <node ns="multijackal_02" pkg="camera_calib" name="camera_calib" type="cam_lidar_calib_node" output="screen">
 
     <param name = "camera_in_topic" type="string" value="/argus/ar0234_front_right/image_raw"/>
-    <param name = "lidar_in_topic" type="string" value="/multijackal_02/velodyne_points"/>
+    <param name = "lidar_in_topic" type="string" value="/multijackal_02/modified_velodyne_points"/>
+    <param name = "image_and_cloud_in_topic" type="string" value="/multijackal_02/image_and_cloud"/>
 
     <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/config_intrinsic_params.yaml" />
     <param name = "result_file" type="string" value="$(find camera_calib)/results/C_T_L.txt"/>

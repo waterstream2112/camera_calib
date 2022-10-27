@@ -54,17 +54,17 @@
 #include <fstream>
 #include <iostream>
 
-typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2,
-                                                        sensor_msgs::Image> SyncPolicy;
+// typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2,
+//                                                         sensor_msgs::Image> SyncPolicy;
 
 class camLidarCalib {
 
 private:
     ros::NodeHandle nh;
 
-    message_filters::Subscriber<sensor_msgs::PointCloud2> *cloud_sub;
-    message_filters::Subscriber<sensor_msgs::Image> *image_sub;
-    message_filters::Synchronizer<SyncPolicy> *sync;
+    // message_filters::Subscriber<sensor_msgs::PointCloud2> *cloud_sub;
+    // message_filters::Subscriber<sensor_msgs::Image> *image_sub;
+    // message_filters::Synchronizer<SyncPolicy> *sync;
 
     // ros::Subscriber imageSub;
     // ros::Subscriber cloudSub;
@@ -128,15 +128,15 @@ private:
 public:
     camLidarCalib(ros::NodeHandle n) {
         nh = n;
-        camera_in_topic = readParam<std::string>(nh, "camera_in_topic");
-        lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
+        // camera_in_topic = readParam<std::string>(nh, "camera_in_topic");
+        // lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
         image_and_cloud_in_topic = readParam<std::string>(nh, "image_and_cloud_in_topic");
 
-        cloud_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
-        image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
-        sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
-        sync->setMaxIntervalDuration(ros::Duration(10.0));
-        sync->registerCallback(boost::bind(&camLidarCalib::callback, this, _1, _2));
+        // cloud_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
+        // image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
+        // sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
+        // sync->setMaxIntervalDuration(ros::Duration(10.0));
+        // sync->registerCallback(boost::bind(&camLidarCalib::callback, this, _1, _2));
 
         // imageSub = n.subscribe(camera_in_topic, 5, &camLidarCalib::imageCallback, this);
         // cloudSub = n.subscribe(lidar_in_topic, 5, &camLidarCalib::cloudCallback, this);
@@ -372,7 +372,7 @@ public:
                 r3 = c_R_w.block<3,1>(0,2);
                 Nc = (r3.dot(c_t_w))*r3;
             }
-            cv::resize(image_in, image_resized, cv::Size(), 1.5, 1.5);
+            cv::resize(image_in, image_resized, cv::Size(), 1.0, 1.0);
             cv::imshow("view", image_resized);
             cv::waitKey(10);
         } catch (cv_bridge::Exception& e) {
@@ -536,7 +536,7 @@ public:
 
     void imageAndCloudCallback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
     {
-        ROS_INFO("Hi");
+        // ROS_INFO("Hi");
         imageHandler(msg);
         cloudHandler(msg);
         runSolver();

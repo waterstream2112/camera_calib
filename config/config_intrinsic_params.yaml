@@ -1,14 +1,14 @@
 %YAML:1.0
-image_width: 960
-image_height: 540
+image_width: 640
+image_height: 480
 # distortion_parameters:
-k1: -0.190169 
-k2: 0.029993
-p1: 0.000889
-p2: 0.000532
+k1: 0.220805 
+k2: -0.551916
+p1: -0.002711
+p2: 0.000137
 k3: 0.000000
 # projection_parameters:
-fx: 411.870238
-fy: 416.306666
-cx: 463.424504
-cy: 271.824776
+fx: 634.110258
+fy: 633.720541
+cx: 315.207914
+cy: 227.867515

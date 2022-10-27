@@ -4,6 +4,7 @@
 
   <param name = "camera_in_topic" type="string" value="/argus/ar0234_front_right/image_raw"/>
   <param name = "lidar_in_topic" type="string" value="/multijackal_02/velodyne_points"/>
+  <param name = "image_and_cloud_in_topic" type="string" value="/multijackal_02/image_and_cloud"/>
   <param name = "camera_name" type="string" value="camera"/>
 
   <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/config_intrinsic_params.yaml" />
