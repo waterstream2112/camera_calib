@@ -21,6 +21,12 @@ rosrun tf static_transform_publisher 0 0 0 0 0 0 1 map multijackal_01 100
 rosrun rviz rviz -f multijackal_01 -d `rospack find camera_calib`/draconis.rviz
 
 
+### workflow during calibration
+
+- opencv window show image feed from camera
+- filtered pointcloud is published
+- plane pointcloud is published
+- 
 
 
 

@@ -30,7 +30,10 @@
 #include <pcl/sample_consensus/sac_model_sphere.h>
 #include <pcl/sample_consensus/sac_model.h>
 
+#include <pcl/segmentation/sac_segmentation.h>
+
 #include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/extract_indices.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -54,8 +57,6 @@
 #include <fstream>
 #include <iostream>
 
-// typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2,
-//                                                         sensor_msgs::Image> SyncPolicy;
 
 class camLidarCalib {
 
@@ -76,8 +77,6 @@ private:
     sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
     sensor_msgs::ImageConstPtr imageMsgPtr;
 
-    
-
     ros::Duration samplingDuration;
     ros::Time prevCycleTime;
 
@@ -95,6 +94,8 @@ private:
     
     int checkerboard_rows, checkerboard_cols;
     int min_points_on_plane;
+    int max_points_on_plane;
+
     cv::Mat tvec, rvec;
     cv::Mat C_R_W;
     Eigen::Matrix3d c_R_w;
@@ -117,9 +118,11 @@ private:
 
     std::string cam_config_file_path;
     int image_width, image_height;
+
     double x_min, x_max;
     double y_min, y_max;
     double z_min, z_max;
+
     double ransac_threshold;
     int no_of_initializations;
     std::string initializations_file;
@@ -151,6 +154,7 @@ public:
         projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
         distCoeff = cv::Mat::zeros(5, 1, CV_64F);
         boardDetectedInCam = false;
+
         tvec = cv::Mat::zeros(3, 1, CV_64F);
         rvec = cv::Mat::zeros(3, 1, CV_64F);
         C_R_W = cv::Mat::eye(3, 3, CV_64F);
@@ -161,6 +165,7 @@ public:
         checkerboard_rows = readParam<int>(nh, "checkerboard_rows");
         checkerboard_cols = readParam<int>(nh, "checkerboard_cols");
         min_points_on_plane = readParam<int>(nh, "min_points_on_plane");
+        max_points_on_plane = readParam<int>(nh, "max_points_on_plane");
         num_views = readParam<int>(nh, "num_views");
         no_of_initializations = readParam<int>(nh, "no_of_initializations");
         initializations_file = readParam<std::string>(nh, "initializations_file");
@@ -267,7 +272,71 @@ public:
         transformation = transformation*trans_noise;
     }
 
-    void cloudHandler(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
+    /// basead on the fact that angle = atan2(norm(cross(a,b)),dot(a,b));
+    /// return value is in radians
+    double angleBetweenVectors(Eigen::Vector3d a, Eigen::Vector3d b) 
+    {
+        double angle = 0.0;
+
+        angle = std::atan2(a.cross(b).norm(), a.dot(b));
+
+        return angle;
+    }
+
+
+    void filterCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &inputCloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &outputCloud)
+    {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_x(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_y(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_z(new pcl::PointCloud<pcl::PointXYZ>);
+
+        /// Pass through filters
+        pcl::PassThrough<pcl::PointXYZ> pass_x;
+        pass_x.setInputCloud(inputCloud);
+        pass_x.setFilterFieldName("x");
+        pass_x.setFilterLimits(x_min, x_max);
+        pass_x.filter(*cloud_filtered_x);
+
+        pcl::PassThrough<pcl::PointXYZ> pass_y;
+        pass_y.setInputCloud(cloud_filtered_x);
+        pass_y.setFilterFieldName("y");
+        pass_y.setFilterLimits(y_min, y_max);
+        pass_y.filter(*cloud_filtered_y);
+
+        pcl::PassThrough<pcl::PointXYZ> pass_z;
+        pass_z.setInputCloud(cloud_filtered_y);
+        pass_z.setFilterFieldName("z");
+        pass_z.setFilterLimits(z_min, z_max);
+        pass_z.filter(*cloud_filtered_z);
+
+        outputCloud = cloud_filtered_z;
+    }
+
+
+    void extractChessboardCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &inputCloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &outputCloud)
+    {
+        //--- Plane Segmentation
+        pcl::SampleConsensusModelPlane<pcl::PointXYZ>::Ptr model_p(
+                new pcl::SampleConsensusModelPlane<pcl::PointXYZ>(inputCloud));
+        pcl::RandomSampleConsensus<pcl::PointXYZ> ransac(model_p);
+        ransac.setDistanceThreshold(ransac_threshold);
+        ransac.computeModel();
+        std::vector<int> inliers_indicies;
+        ransac.getInliers(inliers_indicies);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::copyPointCloud<pcl::PointXYZ>(*inputCloud, inliers_indicies, *plane);
+
+        //--- Statistical Outlier Removal
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+        sor.setInputCloud(plane);
+        sor.setMeanK(50);
+        sor.setStddevMulThresh(1);
+        sor.filter(*outputCloud);
+    }
+
+
+    void cloudHandler_0(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
 
         pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::fromROSMsg(msg->pointcloud, *in_cloud);
@@ -343,6 +412,187 @@ public:
         plane_cloud_pub.publish(out_plane_cloud);
     }
 
+
+    void cloudHandler_1(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::fromROSMsg(msg->pointcloud, *in_cloud);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_x(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_y(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_z(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ >::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ >::Ptr plane_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+
+        /// Pass through filters
+        pcl::PassThrough<pcl::PointXYZ> pass_x;
+        pass_x.setInputCloud(in_cloud);
+        pass_x.setFilterFieldName("x");
+        pass_x.setFilterLimits(x_min, x_max);
+        pass_x.filter(*cloud_filtered_x);
+
+        pcl::PassThrough<pcl::PointXYZ> pass_y;
+        pass_y.setInputCloud(cloud_filtered_x);
+        pass_y.setFilterFieldName("y");
+        pass_y.setFilterLimits(y_min, y_max);
+        pass_y.filter(*cloud_filtered_y);
+
+        pcl::PassThrough<pcl::PointXYZ> pass_z;
+        pass_z.setInputCloud(cloud_filtered_y);
+        pass_z.setFilterFieldName("z");
+        pass_z.setFilterLimits(z_min, z_max);
+        pass_z.filter(*cloud_filtered_z);
+
+        //--- Publish the filtered cloud so can see on rviz
+
+        sensor_msgs::PointCloud2 out_filtered_cloud;
+        pcl::toROSMsg(*cloud_filtered_z, out_filtered_cloud);
+        out_filtered_cloud.header.frame_id = msg->pointcloud.header.frame_id;
+        out_filtered_cloud.header.stamp = msg->pointcloud.header.stamp;
+        filtered_cloud_pub.publish(out_filtered_cloud);
+
+
+        //--- Plane Segmentation
+        pcl::PointCloud<pcl::PointXYZ>::Ptr temp_cloud(cloud_filtered_z);
+
+        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloud_plane_vector;
+        
+        int initNumOfPoints = temp_cloud->size();
+
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+
+        // Create the segmentation object
+        pcl::SACSegmentation<pcl::PointXYZ> seg;
+
+        // Optional
+        seg.setOptimizeCoefficients(true);
+        seg.setModelType(pcl::SACMODEL_PLANE);
+        seg.setMethodType(pcl::SAC_RANSAC);
+        seg.setMaxIterations(1000);
+        seg.setDistanceThreshold(ransac_threshold);
+
+        // Create extract filter
+        pcl::ExtractIndices<pcl::PointXYZ> extract;
+        int k = 0;
+
+        while (temp_cloud->size() > 0.1*initNumOfPoints)
+        {
+            seg.setInputCloud(temp_cloud);
+            seg.segment(*inliers, *coefficients);
+
+            size_t numPointsOnPlane = inliers->indices.size ();
+
+            // Create the filtering object
+            extract.setInputCloud(temp_cloud);
+            extract.setIndices(inliers);
+            
+            if (!((min_points_on_plane < numPointsOnPlane) && (numPointsOnPlane < max_points_on_plane)))
+            {
+                extract.setNegative(true);
+                extract.filter(*temp_cloud);
+                continue;
+            }
+
+            ROS_INFO("inside while loop %d, %ld", k, numPointsOnPlane);
+            k++;
+
+            // Extract the inliers
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane(new pcl::PointCloud<pcl::PointXYZ>);
+            extract.setNegative(false);
+            extract.filter(*cloud_plane);
+
+            cloud_plane_vector.push_back(cloud_plane);
+
+            if (cloud_plane_vector.size() > 20)
+                break;
+
+            // Get the rest of the cloud for next iteration
+            extract.setNegative(true);
+            extract.filter(*temp_cloud);
+        }
+
+        if (cloud_plane_vector.size() == 0)
+            return;
+
+        int selected_cloud_index = 0;
+        size_t number_of_point_min = cloud_plane_vector[selected_cloud_index]->size();
+
+        for (int i = 1; i < cloud_plane_vector.size(); i++)
+        {
+            if (cloud_plane_vector[i]->size() < number_of_point_min)
+            {
+                selected_cloud_index = i;
+                number_of_point_min = cloud_plane_vector[i]->size();
+            }
+        }
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr selected_cloud = cloud_plane_vector[selected_cloud_index];
+
+
+        /// Store the points lying in the filtered plane in a vector
+        lidar_points.clear();
+        for (size_t i = 0; i < selected_cloud->points.size(); i++) {
+            double X = selected_cloud->points[i].x;
+            double Y = selected_cloud->points[i].y;
+            double Z = selected_cloud->points[i].z;
+            lidar_points.push_back(Eigen::Vector3d(X, Y, Z));
+        }
+
+        ROS_WARN_STREAM("No of planar_pts: " << selected_cloud->points.size());
+
+
+        //--- Publish the plane cloud so can see on rviz
+
+        sensor_msgs::PointCloud2 out_plane_cloud;
+        pcl::toROSMsg(*selected_cloud, out_plane_cloud);
+        out_plane_cloud.header.frame_id = msg->pointcloud.header.frame_id;
+        out_plane_cloud.header.stamp = msg->pointcloud.header.stamp;
+        plane_cloud_pub.publish(out_plane_cloud);
+    }
+
+
+    void cloudHandler(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
+    {
+        //--- Get input cloud
+        pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::fromROSMsg(msg->pointcloud, *in_cloud);
+
+        //--- Filter input cloud
+        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        filterCloud(in_cloud, filtered_cloud);
+
+        //--- Extract chessboard cloud
+        pcl::PointCloud<pcl::PointXYZ>::Ptr chessboard_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        extractChessboardCloud(filtered_cloud, chessboard_cloud);
+
+        //--- Store the points lying in the filtered plane in a vector
+        lidar_points.clear();
+        for (size_t i = 0; i < chessboard_cloud->points.size(); i++) {
+            double X = chessboard_cloud->points[i].x;
+            double Y = chessboard_cloud->points[i].y;
+            double Z = chessboard_cloud->points[i].z;
+            lidar_points.push_back(Eigen::Vector3d(X, Y, Z));
+        }
+
+        //--- Publish the filtered cloud so can see on rviz
+        sensor_msgs::PointCloud2 out_filtered_cloud;
+        pcl::toROSMsg(*filtered_cloud, out_filtered_cloud);
+        out_filtered_cloud.header.frame_id = msg->pointcloud.header.frame_id;
+        out_filtered_cloud.header.stamp = msg->pointcloud.header.stamp;
+        filtered_cloud_pub.publish(out_filtered_cloud);
+
+
+        //--- Publish the plane cloud so can see on rviz
+        sensor_msgs::PointCloud2 out_plane_cloud;
+        pcl::toROSMsg(*chessboard_cloud, out_plane_cloud);
+        out_plane_cloud.header.frame_id = msg->pointcloud.header.frame_id;
+        out_plane_cloud.header.stamp = msg->pointcloud.header.stamp;
+        plane_cloud_pub.publish(out_plane_cloud);
+
+    }
+
+
     void imageHandler(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
         try {
             boost::shared_ptr<void const> tracked_object;
@@ -356,7 +606,8 @@ public:
             //                           cv::Size(checkerboard_cols, checkerboard_rows),
             //                           image_points,
             //                           boardDetectedInCam);
-            if(image_points.size() == object_points.size()){
+            if(image_points.size() == object_points.size())
+            {
                 cv::solvePnP(object_points, image_points, projection_matrix, distCoeff, rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
                 projected_points.clear();
                 cv::projectPoints(object_points, rvec, tvec, projection_matrix, distCoeff, projected_points, cv::noArray());
@@ -538,6 +789,10 @@ public:
     {
         // ROS_INFO("Hi");
         imageHandler(msg);
+
+        if (!boardDetectedInCam)
+            return;
+
         cloudHandler(msg);
         runSolver();
     }

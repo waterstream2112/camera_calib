@@ -19,14 +19,15 @@
     <param name = "checkerboard_rows" type = "int" value = "9" />
     <param name = "checkerboard_cols" type = "int" value = "6" />
 
-    <param name = "min_points_on_plane" type="int" value="450"/>
+    <param name = "min_points_on_plane" type="int" value="165"/>
+    <param name = "max_points_on_plane" type="int" value="800"/>
     <param name = "num_views" type="int" value="10"/>
 
-    <param name="x_min" value="0.5"/>
+    <param name="x_min" value="1"/>
     <param name="x_max" value="3"/>
     <param name="y_min" value="-1.5"/>
     <param name="y_max" value="1.5"/>
-    <param name="z_min" value="-.25"/>
+    <param name="z_min" value="-.3"/>
     <param name="z_max" value="1"/>
     <param name="ransac_threshold" value="0.01"/>
 
