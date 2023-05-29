@@ -1,38 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
 
-  <param name ="/use_sim_time" value="false"/>
+  <!-- <param name ="/use_sim_time" value="false"/> -->
 
-  <node ns="multijackal_02" pkg="camera_calib" name="camera_calib" type="cam_lidar_calib_node" output="screen">
+  <group ns="$(env ROBOT_NAMESPACE)">
 
-    <param name = "camera_in_topic" type="string" value="/argus/ar0234_front_right/image_raw"/>
-    <param name = "lidar_in_topic" type="string" value="/multijackal_02/modified_velodyne_points"/>
-    <param name = "image_and_cloud_in_topic" type="string" value="/multijackal_02/image_and_cloud"/>
+    <node pkg="camera_calib" name="camera_calib" type="cam_lidar_calib_node" output="screen">
 
-    <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/config_intrinsic_params.yaml" />
-    <param name = "result_file" type="string" value="$(find camera_calib)/results/C_T_L.txt"/>
-    <param name = "result_rpy_file" type="string" value="$(find camera_calib)/results/rpy_txyz.txt"/>
+      <param name = "topic_input_image_and_cloud" type="string" value="/$(env ROBOT_NAMESPACE)/image_and_cloud"/>
+      <param name = "topic_output_viz_cloud_1" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_1"/>
+      <param name = "topic_output_viz_cloud_2" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_2"/>
+      <param name = "topic_output_viz_cloud_3" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_3"/>
 
-    <param name = "dx" type="double" value="0.04"/>
-    <param name = "dy" type="double" value="0.04"/>
+      <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/$(env ROBOT_NAMESPACE)_config_intrinsic_params.yaml" />
+      <param name = "result_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_C_T_L.txt"/>
+      <param name = "result_rpy_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_rpy_txyz.txt"/>
 
-    <param name = "checkerboard_rows" type = "int" value = "9" />
-    <param name = "checkerboard_cols" type = "int" value = "6" />
+      <param name = "initializations_file" value="/home/subodh/catkin_ws/src/camera_lidar_calibration/calibration/debug_data/results/methodA/left_vlp/random_init.txt"/>
 
-    <param name = "min_points_on_plane" type="int" value="165"/>
-    <param name = "max_points_on_plane" type="int" value="800"/>
-    <param name = "num_views" type="int" value="10"/>
+      <rosparam file="$(find camera_calib)/config/calib_params.yaml" />
 
-    <param name="x_min" value="1"/>
-    <param name="x_max" value="3"/>
-    <param name="y_min" value="-1.5"/>
-    <param name="y_max" value="1.5"/>
-    <param name="z_min" value="-.3"/>
-    <param name="z_max" value="1"/>
-    <param name="ransac_threshold" value="0.01"/>
+      <!-- <param name = "dx" type="double" value="0.04"/>
+      <param name = "dy" type="double" value="0.04"/>
 
-    <param name = "no_of_initializations" type="int" value="1"/>
-    <param name = "initializations_file" value="/home/subodh/catkin_ws/src/camera_lidar_calibration/calibration/debug_data/results/methodA/left_vlp/random_init.txt"/>
+      <param name = "checkerboard_rows" type = "int" value = "9" />
+      <param name = "checkerboard_cols" type = "int" value = "6" />
 
-  </node>
+      <param name = "min_points_on_plane" type="int" value="165"/>
+      <param name = "max_points_on_plane" type="int" value="800"/>
+      <param name = "num_views" type="int" value="10"/>
+
+      <param name="x_min" value="1"/>
+      <param name="x_max" value="3"/>
+      <param name="y_min" value="-1.5"/>
+      <param name="y_max" value="1.5"/>
+      <param name="z_min" value="-.3"/>
+      <param name="z_max" value="1"/>
+
+      <param name="ransac_threshold" value="0.01"/>
+
+      <param name = "num_of_initializations" type="int" value="1"/> -->
+      
+
+    </node>
+  </group>
 </launch>

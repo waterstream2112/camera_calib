@@ -1,22 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
-  <param name ="/use_sim_time" value="false"/>
+  <!-- <param name ="/use_sim_time" value="false"/> -->
 
   <param name = "camera_in_topic" type="string" value="/argus/ar0234_front_right/image_raw"/>
-  <param name = "lidar_in_topic" type="string" value="/multijackal_02/velodyne_points"/>
-  <param name = "image_and_cloud_in_topic" type="string" value="/multijackal_02/image_and_cloud"/>
+  <param name = "lidar_in_topic" type="string" value="/$(env ROBOT_NAMESPACE)/velodyne_points"/>
+  <param name = "image_and_cloud_in_topic" type="string" value="/$(env ROBOT_NAMESPACE)/image_and_cloud"/>
   <param name = "camera_name" type="string" value="camera"/>
 
-  <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/config_intrinsic_params.yaml" />
-  <param name = "result_file" type="string" value="$(find camera_calib)/results/C_T_L.txt"/>
+  <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/$(env ROBOT_NAMESPACE)_config_intrinsic_params.yaml" />
+  <param name = "result_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_C_T_L.txt"/>
 
   <param name= "project_only_plane" type="bool" value="false"/>
 
   <param name = "dist_cut_off" type="int" value="5"/>
 
   <node pkg="tf" type="static_transform_publisher" name="lidar_broadcaster" args="0 0 0 0 0 0 1 map multijackal_02 100" />
-
-  <node  pkg="camera_calib" name="cam_lidar_proj" type="cam_lidar_proj_node" output="screen">
-  </node>
+  <node  pkg="camera_calib" name="cam_lidar_proj" type="cam_lidar_proj_node" output="screen" />
+  
   
 </launch>

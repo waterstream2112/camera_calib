@@ -1,5 +1,5 @@
 
-### Intrinsic calibration
+### Intrinsic camera calibration
 rosrun camera_calibration cameracalibrator.py --no-service-check --size 9x6 --square 0.04 image:=/multijackal_01/d435i_2/color/image_raw camera:=/multijackal_01
 
 rosrun camera_calibration cameracalibrator.py --no-service-check --size 9x6 --square 0.04 image:=/argus/ar0234_front_right/image_raw camera:=/argus
