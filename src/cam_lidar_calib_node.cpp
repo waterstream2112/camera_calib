@@ -142,7 +142,7 @@ public:
         result_rpy = readParam<std::string>(nh, "result_rpy_file");
         cam_config_file_path = readParam<std::string>(nh, "cam_config_file_path");
 
-        num_of_initializations = readParam<int>(nh, "nnum_of_initializations");
+        num_of_initializations = readParam<int>(nh, "num_of_initializations");
         initializations_file = readParam<std::string>(nh, "initializations_file");
 
         dx = readParam<double>(nh, "dx");
@@ -155,6 +155,8 @@ public:
         max_points_on_plane = readParam<int>(nh, "max_points_on_plane");
         num_views = readParam<int>(nh, "num_views");
         
+        projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
+        distCoeff = cv::Mat::zeros(5, 1, CV_64F);
         readCameraParams(cam_config_file_path,
                          image_height,
                          image_width,
@@ -175,8 +177,6 @@ public:
 
 
         //--- Other initialization
-        projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
-        distCoeff = cv::Mat::zeros(5, 1, CV_64F);
         boardDetectedInCam = false;
 
         tvec = cv::Mat::zeros(3, 1, CV_64F);
@@ -209,10 +209,19 @@ public:
                           int &image_height,
                           int &image_width,
                           cv::Mat &D,
-                          cv::Mat &K) {
+                          cv::Mat &K) 
+    {
+        ROS_INFO("<< node::readCameraParams >>");
+
         cv::FileStorage fs_cam_config(cam_config_file_path, cv::FileStorage::READ);
+
         if(!fs_cam_config.isOpened())
+        {
             std::cerr << "Error: Wrong path: " << cam_config_file_path << std::endl;
+            return;
+        }
+            
+        
         fs_cam_config["image_height"] >> image_height;
         fs_cam_config["image_width"] >> image_width;
         fs_cam_config["k1"] >> D.at<double>(0);
@@ -224,6 +233,7 @@ public:
         fs_cam_config["fy"] >> K.at<double>(1, 1);
         fs_cam_config["cx"] >> K.at<double>(0, 2);
         fs_cam_config["cy"] >> K.at<double>(1, 2);
+        
     }
 
 
@@ -248,14 +258,14 @@ public:
     {
         ROS_INFO("<< node::imageAndCloudCallback >>");
 
-        imageHandler(msg);
+        // imageHandler(msg);
 
-        if (!boardDetectedInCam)
-            return;
+        // if (!boardDetectedInCam)
+        //     return;
 
         cloudHandler(msg);
 
-        runSolver();
+        // runSolver();
     }
 
 

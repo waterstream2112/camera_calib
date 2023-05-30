@@ -12,11 +12,11 @@
       <param name = "topic_output_viz_cloud_2" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_2"/>
       <param name = "topic_output_viz_cloud_3" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_3"/>
 
-      <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/$(env ROBOT_NAMESPACE)_config_intrinsic_params.yaml" />
+      <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_front_right_intrinsic.yaml" />
       <param name = "result_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_C_T_L.txt"/>
       <param name = "result_rpy_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_rpy_txyz.txt"/>
 
-      <param name = "initializations_file" value="/home/subodh/catkin_ws/src/camera_lidar_calibration/calibration/debug_data/results/methodA/left_vlp/random_init.txt"/>
+      <!-- <param name = "initializations_file" value="/home/subodh/catkin_ws/src/camera_lidar_calibration/calibration/debug_data/results/methodA/left_vlp/random_init.txt"/> -->
 
       <rosparam file="$(find camera_calib)/config/calib_params.yaml" />
 
