@@ -66,15 +66,15 @@ private:
     ros::Subscriber imageAndCloudSub;
 
     ros::Publisher vizCloud1Pub, vizCloud2Pub, vizCloud3Pub;
-    ros::Publisher filtered_cloud_pub;
-    ros::Publisher plane_cloud_pub;
+    // ros::Publisher filtered_cloud_pub;
+    // ros::Publisher plane_cloud_pub;
 
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> vizCloud1;
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> vizCloud2;
     std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> vizCloud3;
 
-    sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
-    sensor_msgs::ImageConstPtr imageMsgPtr;
+    // sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
+    // sensor_msgs::ImageConstPtr imageMsgPtr;
 
     cv::Mat image_in;
     cv::Mat image_resized;
@@ -108,10 +108,6 @@ private:
 
     std::string result_str, result_rpy;
 
-    // std::string camera_in_topic;
-    // std::string lidar_in_topic;
-    // std::string topic_input_image_and_cloud;
-
     int num_views;
 
     std::string cam_config_file_path;
@@ -121,7 +117,7 @@ private:
     double y_min, y_max;
     double z_min, z_max;
 
-    double ransac_threshold;
+    double ransac_threshold = 0.01;
 
     int sor_mean_k = 50;
     double sor_std_dev = 1.0;
@@ -203,8 +199,8 @@ public:
         vizCloud2Pub = nh.advertise<sensor_msgs::PointCloud2>(topic_output_viz_cloud_2, 5);
         vizCloud3Pub = nh.advertise<sensor_msgs::PointCloud2>(topic_output_viz_cloud_3, 5);
 
-        filtered_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("filtered_cloud_out", 1);
-        plane_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("plane_cloud_out", 1);
+        // filtered_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("filtered_cloud_out", 1);
+        // plane_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("plane_cloud_out", 1);
 
     }
 

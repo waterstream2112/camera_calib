@@ -54,24 +54,16 @@
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2,
                                                         sensor_msgs::Image> SyncPolicy;
 
-class lidarImageProjection {
+class lidarImageProjection 
+{
 private:
 
     ros::NodeHandle nh;
 
-    // message_filters::Subscriber<sensor_msgs::PointCloud2> *cloud_sub;
-    // message_filters::Subscriber<sensor_msgs::Image> *image_sub;
-    // message_filters::Synchronizer<SyncPolicy> *sync;
-
-    // ros::Subscriber imageSub;
-    // ros::Subscriber cloudSub;
     ros::Subscriber imageAndCloudSub;
 
     ros::Publisher cloud_pub;
     ros::Publisher image_pub;
-
-    // sensor_msgs::PointCloud2ConstPtr cloudMsgPtr;
-    // sensor_msgs::ImageConstPtr imageMsgPtr;
 
     ros::Duration samplingDuration;
     ros::Time prevCycleTime;
@@ -95,54 +87,67 @@ private:
 
     std::string lidar_frameId;
 
-    // std::string camera_in_topic;
-    // std::string lidar_in_topic;
-    std::string image_and_cloud_in_topic;
-
     pcl::PointCloud<pcl::PointXYZRGB> out_cloud_pcl;
     cv::Mat image_in;
 
-    int dist_cut_off;
+    int cloud_cutoff_distance;
 
     std::string cam_config_file_path;
     int image_width, image_height;
 
     std::string camera_name;
 
+    double x_min, x_max;
+    double y_min, y_max;
+    double z_min, z_max;
+
+    double ransac_threshold = 0.01;
+
+    int sor_mean_k = 50;
+    double sor_std_dev = 1.0;
+
 public:
-    lidarImageProjection() {
-        // camera_in_topic = readParam<std::string>(nh, "camera_in_topic");
-        // lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
-        image_and_cloud_in_topic = readParam<std::string>(nh, "image_and_cloud_in_topic");
-        dist_cut_off = readParam<int>(nh, "dist_cut_off");
+    lidarImageProjection() 
+    {
+        //--- Read params
+        std::string topic_input_image_and_cloud = readParam<std::string>(nh, "topic_input_image_and_cloud");
+        std::string lidarOutTopic = readParam<std::string>(nh, "topic_output_velodyne_cloud");
+        std::string imageOutTopic = readParam<std::string>(nh, "topic_output_projected_image");
+
+        cloud_cutoff_distance = readParam<int>(nh, "dist_cut_off");
         camera_name = readParam<std::string>(nh, "camera_name");
 
-        std::string lidarOutTopic = "/velodyne_out_cloud";
-        std::string imageOutTopic = "/projected_image";
+        result_str = readParam<std::string>(nh, "result_file");
+        project_only_plane = readParam<bool>(nh, "project_only_plane");
 
-        // cloud_sub =  new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
-        // image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
+        cam_config_file_path = readParam<std::string>(nh, "cam_config_file_path");
+        readCameraParams(cam_config_file_path,
+                         image_height,
+                         image_width,
+                         distCoeff,
+                         projection_matrix);
+
         
-        cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
-        image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
+        x_min = readParam<double>(nh, "x_min");
+        x_max = readParam<double>(nh, "x_max");
+        y_min = readParam<double>(nh, "y_min");
+        y_max = readParam<double>(nh, "y_max");
+        z_min = readParam<double>(nh, "z_min");
+        z_max = readParam<double>(nh, "z_max");
 
-        // sync = new message_filters::Synchronizer<SyncPolicy>(SyncPolicy(10), *cloud_sub, *image_sub);
-        // sync->registerCallback(boost::bind(&lidarImageProjection::callback, this, _1, _2));
+        ransac_threshold = readParam<double>(nh, "ransac_threshold");
 
-        // imageSub = nh.subscribe(camera_in_topic, 5, &lidarImageProjection::imageCallback, this);
-        // cloudSub = nh.subscribe(lidar_in_topic, 5, &lidarImageProjection::cloudCallback, this);
-        imageAndCloudSub = nh.subscribe(image_and_cloud_in_topic, 5, &lidarImageProjection::imageAndCloudCallback, this);
+        sor_mean_k = readParam<double>(nh, "sor_mean_k");
+        sor_std_dev = readParam<double>(nh, "sor_std_dev");
 
 
+        //--- Other initialization
         samplingDuration = ros::Duration(0.2);  // in sec
         prevCycleTime = ros::Time(1);
 
         C_T_L = Eigen::Matrix4d::Identity();
         c_R_l = cv::Mat::zeros(3, 3, CV_64F);
         tvec = cv::Mat::zeros(3, 1, CV_64F);
-
-        result_str = readParam<std::string>(nh, "result_file");
-        project_only_plane = readParam<bool>(nh, "project_only_plane");
 
         projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
         distCoeff = cv::Mat::zeros(5, 1, CV_64F);
@@ -173,22 +178,29 @@ public:
         cv::Rodrigues(c_R_l, rvec);
         cv::eigen2cv(C_t_L, tvec);
 
-        cam_config_file_path = readParam<std::string>(nh, "cam_config_file_path");
-        readCameraParams(cam_config_file_path,
-                         image_height,
-                         image_width,
-                         distCoeff,
-                         projection_matrix);
+
+        //--- Subscribers
+        imageAndCloudSub = nh.subscribe(topic_input_image_and_cloud, 5, &lidarImageProjection::imageAndCloudCallback, this);
+
+
+        //--- Publishers
+        cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
+        image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
+
     }
+
 
     void readCameraParams(std::string cam_config_file_path,
                           int &image_height,
                           int &image_width,
                           cv::Mat &D,
-                          cv::Mat &K) {
+                          cv::Mat &K) 
+    {
         cv::FileStorage fs_cam_config(cam_config_file_path, cv::FileStorage::READ);
+
         if(!fs_cam_config.isOpened())
             std::cerr << "Error: Wrong path: " << cam_config_file_path << std::endl;
+
         fs_cam_config["image_height"] >> image_height;
         fs_cam_config["image_width"] >> image_width;
         fs_cam_config["k1"] >> D.at<double>(0);
@@ -202,8 +214,10 @@ public:
         fs_cam_config["cy"] >> K.at<double>(1, 2);
     }
 
+
     template <typename T>
-    T readParam(ros::NodeHandle &n, std::string name){
+    T readParam(ros::NodeHandle &n, std::string name)
+    {
         T ans;
         if (n.getParam(name, ans)){
             ROS_INFO_STREAM("Loaded " << name << ": " << ans);
@@ -214,112 +228,17 @@ public:
         return ans;
     }
 
-    pcl::PointCloud<pcl::PointXYZ >::Ptr planeFilter(sensor_msgs::PointCloud2 &cloud_msg) {
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::fromROSMsg(cloud_msg, *in_cloud);
+    void imageAndCloudCallback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
+    {
+        ROS_INFO("<< node::imageAndCloudCallback >>");
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_x(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_y(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ >::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ >::Ptr plane_filtered(new pcl::PointCloud<pcl::PointXYZ>);
-
-        /// Pass through filters
-        pcl::PassThrough<pcl::PointXYZ> pass_x;
-        pass_x.setInputCloud(in_cloud);
-        pass_x.setFilterFieldName("x");
-        pass_x.setFilterLimits(0.0, 5.0);
-        pass_x.filter(*cloud_filtered_x);
-        pcl::PassThrough<pcl::PointXYZ> pass_y;
-        pass_y.setInputCloud(cloud_filtered_x);
-        pass_y.setFilterFieldName("y");
-        pass_y.setFilterLimits(-1.25, 1.25);
-        pass_y.filter(*cloud_filtered_y);
-
-        /// Plane Segmentation
-        pcl::SampleConsensusModelPlane<pcl::PointXYZ>::Ptr model_p(
-                new pcl::SampleConsensusModelPlane<pcl::PointXYZ>(cloud_filtered_y));
-        pcl::RandomSampleConsensus<pcl::PointXYZ> ransac(model_p);
-        ransac.setDistanceThreshold(0.01);
-        ransac.computeModel();
-        std::vector<int> inliers_indicies;
-        ransac.getInliers(inliers_indicies);
-        pcl::copyPointCloud<pcl::PointXYZ>(*cloud_filtered_y, inliers_indicies, *plane);
-
-        /// Statistical Outlier Removal
-        pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
-        sor.setInputCloud(plane);
-        sor.setMeanK (50);
-        sor.setStddevMulThresh (1);
-        sor.filter (*plane_filtered);
-
-        return plane_filtered;
+        callback(msg);
     }
 
-    cv::Vec3b atf(cv::Mat rgb, cv::Point2d xy_f){
-        cv::Vec3i color_i;
-        color_i.val[0] = color_i.val[1] = color_i.val[2] = 0;
 
-        int x = xy_f.x;
-        int y = xy_f.y;
-
-        for (int row = 0; row <= 1; row++){
-            for (int col = 0; col <= 1; col++){
-                if((x+col)< rgb.cols && (y+row) < rgb.rows) {
-                    cv::Vec3b c = rgb.at<cv::Vec3b>(cv::Point(x + col, y + row));
-                    for (int i = 0; i < 3; i++){
-                        color_i.val[i] += c.val[i];
-                    }
-                }
-            }
-        }
-
-        cv::Vec3b color;
-        for (int i = 0; i < 3; i++){
-            color.val[i] = color_i.val[i] / 4;
-        }
-        return color;
-    }
-
-    void publishTransforms() {
-        static tf::TransformBroadcaster br;
-        tf::Transform transform;
-        tf::Quaternion q;
-        tf::quaternionEigenToTF(L_R_C_quatn, q);
-        transform.setOrigin(tf::Vector3(L_t_C(0), L_t_C(1), L_t_C(2)));
-        transform.setRotation(q);
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), lidar_frameId, camera_name));
-    }
-
-    void colorPointCloud() {
-        out_cloud_pcl.points.clear();
-        out_cloud_pcl.resize(objectPoints_L.size());
-
-        for(size_t i = 0; i < objectPoints_L.size(); i++) {
-            cv::Vec3b rgb = atf(image_in, imagePoints[i]);
-            pcl::PointXYZRGB pt_rgb(rgb.val[2], rgb.val[1], rgb.val[0]);
-            pt_rgb.x = objectPoints_L[i].x;
-            pt_rgb.y = objectPoints_L[i].y;
-            pt_rgb.z = objectPoints_L[i].z;
-            out_cloud_pcl.push_back(pt_rgb);
-        }
-    }
-
-    void colorLidarPointsOnImage(double min_range,
-            double max_range) {
-        for(size_t i = 0; i < imagePoints.size(); i++) {
-            double X = objectPoints_C[i].x;
-            double Y = objectPoints_C[i].y;
-            double Z = objectPoints_C[i].z;
-            double range = sqrt(X*X + Y*Y + Z*Z);
-            double red_field = 255*(range - min_range)/(max_range - min_range);
-            double green_field = 255*(max_range - range)/(max_range - min_range);
-            cv::circle(image_in, imagePoints[i], 2,
-                       CV_RGB(red_field, green_field, 0), -1, 1, 0);
-        }
-    }
-
-    void callback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) {
+    void callback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg) 
+    {
 
         sensor_msgs::PointCloud2 cloud_msg = msg->pointcloud;
         sensor_msgs::Image image_msg = msg->image;
@@ -329,11 +248,11 @@ public:
         objectPoints_L.clear();
         objectPoints_C.clear();
         imagePoints.clear();
+
         publishTransforms();
         
         boost::shared_ptr<void const> tracked_object;
         image_in = cv_bridge::toCvShare(image_msg, tracked_object, "bgr8")->image;
-
 
         double fov_x, fov_y;
         fov_x = 2*atan2(image_width, 2*projection_matrix.at<double>(0, 0))*180/CV_PI;
@@ -344,21 +263,36 @@ public:
         min_range = INFINITY;
 
         pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        if(project_only_plane) {
-            in_cloud = planeFilter(cloud_msg);
-            for(size_t i = 0; i < in_cloud->points.size(); i++) {
+
+        if (project_only_plane)  // only project onto planes
+        {
+            in_cloud = extractPlane(cloud_msg);
+
+            for(size_t i = 0; i < in_cloud->points.size(); i++) 
+            {
                 objectPoints_L.push_back(cv::Point3d(in_cloud->points[i].x, in_cloud->points[i].y, in_cloud->points[i].z));
             }
-            cv::projectPoints(objectPoints_L, rvec, tvec, projection_matrix, distCoeff, imagePoints, cv::noArray());
-        } else {
+
+            cv::projectPoints(objectPoints_L, 
+                              rvec, 
+                              tvec, 
+                              projection_matrix, 
+                              distCoeff, 
+                              imagePoints, 
+                              cv::noArray());
+
+        } 
+        else 
+        {
             pcl::PCLPointCloud2 *cloud_in = new pcl::PCLPointCloud2;
             pcl_conversions::toPCL(cloud_msg, *cloud_in);
             pcl::fromPCLPointCloud2(*cloud_in, *in_cloud);
 
-            for(size_t i = 0; i < in_cloud->points.size(); i++) {
+            for(size_t i = 0; i < in_cloud->points.size(); i++) 
+            {
 
                 // Reject points behind the LiDAR(and also beyond certain distance)
-                if(in_cloud->points[i].x < 0 || in_cloud->points[i].x > dist_cut_off)
+                if(in_cloud->points[i].x < 0 || in_cloud->points[i].x > cloud_cutoff_distance)
                     continue;
 
                 Eigen::Vector4d pointCloud_L;
@@ -385,17 +319,27 @@ public:
 
                 double range = sqrt(X*X + Y*Y + Z*Z);
 
-                if(range > max_range) {
+                if(range > max_range) 
+                {
                     max_range = range;
                 }
-                if(range < min_range) {
+
+                if(range < min_range) 
+                {
                     min_range = range;
                 }
 
                 objectPoints_L.push_back(cv::Point3d(pointCloud_L[0], pointCloud_L[1], pointCloud_L[2]));
                 objectPoints_C.push_back(cv::Point3d(X, Y, Z));
             }
-            cv::projectPoints(objectPoints_L, rvec, tvec, projection_matrix, distCoeff, imagePoints, cv::noArray());
+
+            cv::projectPoints(objectPoints_L, 
+                              rvec, 
+                              tvec, 
+                              projection_matrix, 
+                              distCoeff, 
+                              imagePoints, 
+                              cv::noArray());
         }
 
         /// Color the Point Cloud
@@ -413,51 +357,161 @@ public:
         sensor_msgs::ImagePtr out_msg =
                 cv_bridge::CvImage(std_msgs::Header(), "bgr8", image_in).toImageMsg();
         image_pub.publish(out_msg);
-//        cv::Mat image_resized;
-//        cv::resize(lidarPtsImg, image_resized, cv::Size(), 0.25, 0.25);
-//        cv::imshow("view", image_resized);
-//        cv::waitKey(10);
+
+        // cv::Mat image_resized;
+        // cv::resize(lidarPtsImg, image_resized, cv::Size(), 0.25, 0.25);
+        // cv::imshow("view", image_resized);
+        // cv::waitKey(10);
     }
+    
 
-
-    void imageAndCloudCallback(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
+    pcl::PointCloud<pcl::PointXYZ >::Ptr extractPlane(sensor_msgs::PointCloud2 &cloud_msg) 
     {
-        // ROS_INFO("Hi");
-        callback(msg);
+        ROS_INFO("<< node::extractPlane >>");
+
+        //--- Convert ROS cloud to PCL cloud
+        pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::fromROSMsg(cloud_msg, *in_cloud);
+
+        //--- Filter cloud
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+        filterCloud(in_cloud, cloud_filtered);
+        cloud_filtered->header = in_cloud->header;
+
+        //--- Plane Segmentation, using RANSAC algorithm
+        pcl::PointCloud<pcl::PointXYZ >::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ >::Ptr plane_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::SampleConsensusModelPlane<pcl::PointXYZ>::Ptr model_p(
+                new pcl::SampleConsensusModelPlane<pcl::PointXYZ>(cloud_filtered));
+        pcl::RandomSampleConsensus<pcl::PointXYZ> ransac(model_p);
+
+        ransac.setDistanceThreshold(ransac_threshold);
+        ransac.computeModel();
+
+        std::vector<int> inliers_indicies;
+        ransac.getInliers(inliers_indicies);
+        pcl::copyPointCloud<pcl::PointXYZ>(*cloud_filtered, inliers_indicies, *plane);
+
+        //--- Statistical Outlier Removal
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+        sor.setInputCloud(plane);
+        sor.setMeanK (sor_mean_k);
+        sor.setStddevMulThresh (sor_std_dev);
+        sor.filter (*plane_filtered);
+
+        return plane_filtered;
     }
 
-    void imageCallback(const sensor_msgs::ImageConstPtr &image_msg)
+
+    void filterCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &inputCloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &outputCloud)
     {
-        // ROS_INFO("image %0.2f", image_msg->header.stamp.toSec());
+        ROS_INFO("<< node::filterCloud >>");
 
-        // ros::Duration period = ros::Time::now() - prevCycleTime;
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_x(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_y(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_z(new pcl::PointCloud<pcl::PointXYZ>);
 
-        // if (period < samplingDuration)
-        //     return;
+        /// Pass through filters
+        pcl::PassThrough<pcl::PointXYZ> pass_x;
+        pass_x.setInputCloud(inputCloud);
+        pass_x.setFilterFieldName("x");
+        pass_x.setFilterLimits(x_min, x_max);
+        pass_x.filter(*cloud_filtered_x);
 
-        // prevCycleTime = ros::Time::now();
+        pcl::PassThrough<pcl::PointXYZ> pass_y;
+        pass_y.setInputCloud(cloud_filtered_x);
+        pass_y.setFilterFieldName("y");
+        pass_y.setFilterLimits(y_min, y_max);
+        pass_y.filter(*cloud_filtered_y);
 
+        pcl::PassThrough<pcl::PointXYZ> pass_z;
+        pass_z.setInputCloud(cloud_filtered_y);
+        pass_z.setFilterFieldName("z");
+        pass_z.setFilterLimits(z_min, z_max);
+        pass_z.filter(*cloud_filtered_z);
 
-        // if (cloudMsgPtr == NULL)
-        //     return;
-
-        // ros::Duration timeDiff = image_msg->header.stamp - cloudMsgPtr->header.stamp;
-        // ROS_INFO("timeDiff %0.3f", timeDiff.toSec());
-
-        // ROS_INFO("image %0.3f", (ros::Time::now() - image_msg->header.stamp).toSec());
-        // ROS_INFO("cloud %0.3f", (ros::Time::now() - cloudMsgPtr->header.stamp).toSec());
-
-        // callback(cloudMsgPtr, image_msg);
+        outputCloud = cloud_filtered_z;
     }
 
-    void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
+
+
+    cv::Vec3b atf(cv::Mat rgb, cv::Point2d xy_f)
     {
-        // ROS_INFO("cloud %0.2f", cloud_msg->header.stamp.toSec());
-        // cloudMsgPtr = cloud_msg;
+        cv::Vec3i color_i;
+        color_i.val[0] = color_i.val[1] = color_i.val[2] = 0;
 
-        // ROS_INFO("cloudCallback %0.3f", (ros::Time::now() - cloudMsgPtr->header.stamp).toSec());
+        int x = xy_f.x;
+        int y = xy_f.y;
+
+        for (int row = 0; row <= 1; row++){
+            for (int col = 0; col <= 1; col++){
+                if((x+col)< rgb.cols && (y+row) < rgb.rows) {
+                    cv::Vec3b c = rgb.at<cv::Vec3b>(cv::Point(x + col, y + row));
+                    for (int i = 0; i < 3; i++){
+                        color_i.val[i] += c.val[i];
+                    }
+                }
+            }
+        }
+
+        cv::Vec3b color;
+        for (int i = 0; i < 3; i++){
+            color.val[i] = color_i.val[i] / 4;
+        }
+        return color;
     }
+
+
+    void publishTransforms() 
+    {
+        static tf::TransformBroadcaster br;
+        tf::Transform transform;
+        tf::Quaternion q;
+        tf::quaternionEigenToTF(L_R_C_quatn, q);
+        transform.setOrigin(tf::Vector3(L_t_C(0), L_t_C(1), L_t_C(2)));
+        transform.setRotation(q);
+        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), lidar_frameId, camera_name));
+    }
+
+
+    void colorPointCloud() 
+    {
+        out_cloud_pcl.points.clear();
+        out_cloud_pcl.resize(objectPoints_L.size());
+
+        for(size_t i = 0; i < objectPoints_L.size(); i++) {
+            cv::Vec3b rgb = atf(image_in, imagePoints[i]);
+            pcl::PointXYZRGB pt_rgb(rgb.val[2], rgb.val[1], rgb.val[0]);
+            pt_rgb.x = objectPoints_L[i].x;
+            pt_rgb.y = objectPoints_L[i].y;
+            pt_rgb.z = objectPoints_L[i].z;
+            out_cloud_pcl.push_back(pt_rgb);
+        }
+    }
+
+
+    void colorLidarPointsOnImage(double min_range, double max_range) 
+    {
+        for(size_t i = 0; i < imagePoints.size(); i++) {
+            double X = objectPoints_C[i].x;
+            double Y = objectPoints_C[i].y;
+            double Z = objectPoints_C[i].z;
+            double range = sqrt(X*X + Y*Y + Z*Z);
+            double red_field = 255*(range - min_range)/(max_range - min_range);
+            double green_field = 255*(max_range - range)/(max_range - min_range);
+
+            cv::circle(image_in, 
+                        imagePoints[i], 
+                        2,
+                       CV_RGB(red_field, green_field, 0), 
+                       -1, 
+                       1, 
+                       0);
+        }
+    }
+
 };
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "cam_lidar_proj");
