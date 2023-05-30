@@ -121,6 +121,9 @@ public:
         project_only_plane = readParam<bool>(nh, "project_only_plane");
 
         cam_config_file_path = readParam<std::string>(nh, "cam_config_file_path");
+
+        projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
+        distCoeff = cv::Mat::zeros(5, 1, CV_64F);
         readCameraParams(cam_config_file_path,
                          image_height,
                          image_width,
@@ -149,21 +152,27 @@ public:
         c_R_l = cv::Mat::zeros(3, 3, CV_64F);
         tvec = cv::Mat::zeros(3, 1, CV_64F);
 
-        projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
-        distCoeff = cv::Mat::zeros(5, 1, CV_64F);
-
+        ROS_INFO("result file: %s", result_str.c_str());
         std::ifstream myReadFile(result_str.c_str());
         std::string word;
         int i = 0;
         int j = 0;
-        while (myReadFile >> word){
-            C_T_L(i, j) = atof(word.c_str());
+
+        while (myReadFile >> word)
+        {
+            ROS_INFO("word: %s", word.c_str());
+            C_T_L(i, j) = std::stod(word);
+            ROS_INFO("%.3f", C_T_L(i, j));
+
             j++;
-            if(j>3) {
+
+            if (j>3) 
+            {
                 j = 0;
                 i++;
             }
         }
+
         L_T_C = C_T_L.inverse();
 
         C_R_L = C_T_L.block(0, 0, 3, 3);
@@ -181,7 +190,6 @@ public:
 
         //--- Subscribers
         imageAndCloudSub = nh.subscribe(topic_input_image_and_cloud, 5, &lidarImageProjection::imageAndCloudCallback, this);
-
 
         //--- Publishers
         cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
@@ -249,7 +257,7 @@ public:
         objectPoints_C.clear();
         imagePoints.clear();
 
-        publishTransforms();
+        // publishTransforms();
         
         boost::shared_ptr<void const> tracked_object;
         image_in = cv_bridge::toCvShare(image_msg, tracked_object, "bgr8")->image;

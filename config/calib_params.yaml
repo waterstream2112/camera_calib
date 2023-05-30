@@ -6,7 +6,7 @@ checkerboard_rows: 9
 checkerboard_cols: 6
 
 min_points_on_plane: 165
-max_points_on_plane: 800
+max_points_on_plane: 500
 
 num_views: 10
 num_of_initializations: 1

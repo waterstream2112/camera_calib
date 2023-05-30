@@ -11,10 +11,11 @@
 
   <param name = "camera_name" type="string" value="camera"/>
   
-  <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/$(env ROBOT_NAMESPACE)_config_intrinsic_params.yaml" />
-  <param name = "result_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_C_T_L.txt"/>
+  <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_front_right.yaml" />
+  <param name = "result_file" type="string" value="$(find camera_calib)/results/C_T_L_dog2_argus_front_right.txt" />
 
   <param name= "project_only_plane" type="bool" value="false"/>
+
   <param name = "dist_cut_off" type="int" value="5"/>
 
   <node  pkg="camera_calib" name="cam_lidar_proj" type="cam_lidar_proj_node" output="screen" />

@@ -123,8 +123,8 @@ private:
     double sor_std_dev = 1.0;
 
     int num_of_initializations;
-    std::string initializations_file;
-    std::ofstream init_file;
+    // std::string initializations_file;
+    // std::ofstream init_file;
 
 public:
     camLidarCalib(ros::NodeHandle n) {
@@ -143,7 +143,7 @@ public:
         cam_config_file_path = readParam<std::string>(nh, "cam_config_file_path");
 
         num_of_initializations = readParam<int>(nh, "num_of_initializations");
-        initializations_file = readParam<std::string>(nh, "initializations_file");
+        // initializations_file = readParam<std::string>(nh, "initializations_file");
 
         dx = readParam<double>(nh, "dx");
         dy = readParam<double>(nh, "dy");
@@ -258,14 +258,14 @@ public:
     {
         ROS_INFO("<< node::imageAndCloudCallback >>");
 
-        // imageHandler(msg);
+        imageHandler(msg);
 
-        // if (!boardDetectedInCam)
-        //     return;
+        if (!boardDetectedInCam)
+            return;
 
         cloudHandler(msg);
 
-        // runSolver();
+        runSolver();
     }
 
 
@@ -525,22 +525,6 @@ public:
         vizCloud2.push_back(chessboard_cloud);
         publishColoredPclClouds(vizCloud2Pub, vizCloud2, std::vector<int>{255, 0, 0});
 
-
-        //--- Publish the filtered cloud so can see on rviz
-        // sensor_msgs::PointCloud2 out_filtered_cloud;
-        // pcl::toROSMsg(*filtered_cloud, out_filtered_cloud);
-        // out_filtered_cloud.header.frame_id = msg->pointcloud.header.frame_id;
-        // out_filtered_cloud.header.stamp = msg->pointcloud.header.stamp;
-        // filtered_cloud_pub.publish(out_filtered_cloud);
-
-
-        //--- Publish the plane cloud so can see on rviz
-        // sensor_msgs::PointCloud2 out_plane_cloud;
-        // pcl::toROSMsg(*chessboard_cloud, out_plane_cloud);
-        // out_plane_cloud.header.frame_id = msg->pointcloud.header.frame_id;
-        // out_plane_cloud.header.stamp = msg->pointcloud.header.stamp;
-        // plane_cloud_pub.publish(out_plane_cloud);
-
     }
 
 
@@ -626,7 +610,7 @@ public:
                 ROS_INFO_STREAM("Recording View number: " << all_normals.size());
                 if (all_normals.size() >= num_views) {
                     ROS_INFO_STREAM("Starting optimization...");
-                    init_file.open(initializations_file);
+                    // init_file.open(initializations_file);
                     for(int counter = 0; counter < num_of_initializations; counter++) {
                         /// Start Optimization here
 
@@ -688,10 +672,10 @@ public:
                         std::cout << "RPY = " << Rotn.eulerAngles(0, 1, 2)*180/M_PI << std::endl;
                         std::cout << "t = " << C_T_L.block(0, 3, 3, 1) << std::endl;
 
-                        init_file << rpy_init(0) << "," << rpy_init(1) << "," << rpy_init(2) << ","
-                                  << tran_init(0) << "," << tran_init(1) << "," << tran_init(2) << "\n";
-                        init_file << Rotn.eulerAngles(0, 1, 2)(0)*180/M_PI << "," << Rotn.eulerAngles(0, 1, 2)(1)*180/M_PI << "," << Rotn.eulerAngles(0, 1, 2)(2)*180/M_PI << ","
-                                  << R_t[3] << "," << R_t[4] << "," << R_t[5] << "\n";
+                        // init_file << rpy_init(0) << "," << rpy_init(1) << "," << rpy_init(2) << ","
+                        //           << tran_init(0) << "," << tran_init(1) << "," << tran_init(2) << "\n";
+                        // init_file << Rotn.eulerAngles(0, 1, 2)(0)*180/M_PI << "," << Rotn.eulerAngles(0, 1, 2)(1)*180/M_PI << "," << Rotn.eulerAngles(0, 1, 2)(2)*180/M_PI << ","
+                        //           << R_t[3] << "," << R_t[4] << "," << R_t[5] << "\n";
 
                         /// Step 5: Covariance Estimation
                         ceres::Covariance::Options options_cov;
@@ -743,7 +727,7 @@ public:
                         ROS_INFO_STREAM("No of initialization: " << counter);
                     }
 
-                    init_file.close();
+                    // init_file.close();
                     ros::shutdown();
 
                 }
@@ -854,6 +838,7 @@ public:
     }
 
 
+    /*
     void extractChessboardCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &inputCloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &outputCloud)
     {
         ROS_INFO("<< node::extractChessboardCloud >>");
@@ -877,7 +862,79 @@ public:
         sor.setStddevMulThresh(sor_std_dev);
         sor.filter(*outputCloud);
     }
+    */
 
+
+    void extractChessboardCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &inputCloud, 
+                                pcl::PointCloud<pcl::PointXYZ>::Ptr &outputCloud)
+    {
+        ROS_INFO("<< node::extractChessboardCloud >>");
+
+        //--- Create the segmentation object
+        pcl::SACSegmentation<pcl::PointXYZ> seg;
+        
+        // seg.setOptimizeCoefficients(true);
+        seg.setModelType(pcl::SACMODEL_PLANE);
+        seg.setMethodType(pcl::SAC_RANSAC);
+        seg.setMaxIterations(1000);
+        seg.setDistanceThreshold(ransac_threshold);
+        seg.setNumberOfThreads(2);
+
+        //--- Create the filtering object
+        pcl::PointCloud<pcl::PointXYZ>::Ptr remainingCloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::ExtractIndices<pcl::PointXYZ> extract;
+
+        remainingCloud = inputCloud;
+
+        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> detectedPlaneClouds;
+
+        //--- Search for plane clouds
+        while (remainingCloud->points.size() > min_points_on_plane)
+        {
+            // Segment the largest planar component from the remaining cloud
+            pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
+            pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+
+            seg.setInputCloud(remainingCloud);
+            seg.segment(*inliers, *coefficients);   
+            
+            if (inliers->indices.size() == 0)
+            {
+                ROS_WARN("Could not estimate a planar model for the given dataset.");
+                break;
+            }
+
+            // Extract the inliers
+            pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud(new pcl::PointCloud<pcl::PointXYZ>);
+            extract.setInputCloud(remainingCloud);
+            extract.setIndices(inliers);
+            extract.setNegative(false);
+            extract.filter(*planeCloud);
+
+            planeCloud->header = inputCloud->header;
+
+            // Get remaining cloud
+            pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+            extract.setNegative(true);
+            extract.filter(*tempCloud);
+
+            remainingCloud = tempCloud;
+
+            // Get plane cloud
+            if ((min_points_on_plane < planeCloud->size()) &&
+                (planeCloud->size() < max_points_on_plane))
+            {
+                detectedPlaneClouds.push_back(planeCloud);                
+            }
+        }
+
+        if (detectedPlaneClouds.size() == 1)
+            outputCloud = detectedPlaneClouds[0];
+        else 
+            ROS_ERROR("Couldn't detect chessboard point cloud!");
+        
+    }
 
 
     void publishColoredPclClouds(ros::Publisher &publisher,

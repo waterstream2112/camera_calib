@@ -12,35 +12,13 @@
       <param name = "topic_output_viz_cloud_2" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_2"/>
       <param name = "topic_output_viz_cloud_3" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_3"/>
 
-      <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_front_right_intrinsic.yaml" />
-      <param name = "result_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_C_T_L.txt"/>
-      <param name = "result_rpy_file" type="string" value="$(find camera_calib)/results/$(env ROBOT_NAMESPACE)_rpy_txyz.txt"/>
+      <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_front_right.yaml" />
+      <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_front_right_C_T_L.txt"/>
+      <param name = "result_rpy_file" type="string" value="$(find camera_calib)/results/dog2_argus_front_right_rpy_txyz.txt"/>
 
       <!-- <param name = "initializations_file" value="/home/subodh/catkin_ws/src/camera_lidar_calibration/calibration/debug_data/results/methodA/left_vlp/random_init.txt"/> -->
 
       <rosparam file="$(find camera_calib)/config/calib_params.yaml" />
-
-      <!-- <param name = "dx" type="double" value="0.04"/>
-      <param name = "dy" type="double" value="0.04"/>
-
-      <param name = "checkerboard_rows" type = "int" value = "9" />
-      <param name = "checkerboard_cols" type = "int" value = "6" />
-
-      <param name = "min_points_on_plane" type="int" value="165"/>
-      <param name = "max_points_on_plane" type="int" value="800"/>
-      <param name = "num_views" type="int" value="10"/>
-
-      <param name="x_min" value="1"/>
-      <param name="x_max" value="3"/>
-      <param name="y_min" value="-1.5"/>
-      <param name="y_max" value="1.5"/>
-      <param name="z_min" value="-.3"/>
-      <param name="z_max" value="1"/>
-
-      <param name="ransac_threshold" value="0.01"/>
-
-      <param name = "num_of_initializations" type="int" value="1"/> -->
-      
 
     </node>
   </group>

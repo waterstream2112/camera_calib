@@ -5,9 +5,12 @@ rosrun camera_calibration cameracalibrator.py --no-service-check --size 9x6 --sq
 rosrun camera_calibration cameracalibrator.py --no-service-check --size 9x6 --square 0.04 image:=/argus/ar0234_front_right/image_raw camera:=/argus
 
 ### Launch the dog set up file
---> launch either one of these two depending on which dog
+--> launch the following:
 
+roslaunch autonomous_robots_2 velodyne_pointcloud_to_laser_scan.launch (optional, only when there's issue)
+roslaunch autonomous_robots_2 aloam.launch
 roslaunch autonomous_robots_2 handheld_mapping_setup_velodyne_l515.launch
+
 
 ### Extrinsic calibration
 --> change camera and lidar input topic in launch file
