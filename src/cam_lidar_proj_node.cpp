@@ -124,6 +124,7 @@ public:
 
         projection_matrix = cv::Mat::zeros(3, 3, CV_64F);
         distCoeff = cv::Mat::zeros(5, 1, CV_64F);
+        
         readCameraParams(cam_config_file_path,
                          image_height,
                          image_width,
@@ -292,9 +293,11 @@ public:
         } 
         else 
         {
-            pcl::PCLPointCloud2 *cloud_in = new pcl::PCLPointCloud2;
-            pcl_conversions::toPCL(cloud_msg, *cloud_in);
-            pcl::fromPCLPointCloud2(*cloud_in, *in_cloud);
+            // pcl::PCLPointCloud2 *cloud_in = new pcl::PCLPointCloud2;
+            // pcl_conversions::toPCL(cloud_msg, *cloud_in);
+            // pcl::fromPCLPointCloud2(*cloud_in, *in_cloud);
+
+            pcl::fromROSMsg(cloud_msg, *in_cloud);
 
             for(size_t i = 0; i < in_cloud->points.size(); i++) 
             {

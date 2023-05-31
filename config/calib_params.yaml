@@ -5,20 +5,24 @@ dy: 0.04
 checkerboard_rows: 9
 checkerboard_cols: 6
 
-min_points_on_plane: 165
-max_points_on_plane: 500
+min_points_on_plane: 300
+max_points_on_plane: 1500
 
-num_views: 10
+num_views: 15
 num_of_initializations: 1
 
-x_min: 1.0
-x_max: 3.0
-y_min: -1.5
-y_max: 1.5
+x_min: -1.0
+x_max: 4.0
+y_min: -2.5
+y_max: 2.5
 z_min: -0.3
-z_max: 1.0
+z_max: 2.5
 
-ransac_threshold: 0.01
+EUCLID_CLUSTERING_TOLERANCE: 0.2
+EUCLID_CLUSTER_MIN_SIZE: 100
+EUCLID_CLUSTER_MAX_SIZE: 100000
+
+ransac_threshold: 0.05
 
 sor_mean_k: 50
 sor_std_dev: 1.0

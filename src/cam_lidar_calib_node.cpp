@@ -30,6 +30,7 @@
 #include <pcl/sample_consensus/sac_model_sphere.h>
 #include <pcl/sample_consensus/sac_model.h>
 
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/sac_segmentation.h>
 
 #include <pcl/filters/statistical_outlier_removal.h>
@@ -117,6 +118,9 @@ private:
     double y_min, y_max;
     double z_min, z_max;
 
+    double EUCLID_CLUSTERING_TOLERANCE = 0.05;
+    double EUCLID_CLUSTER_MIN_SIZE = 100;
+    double EUCLID_CLUSTER_MAX_SIZE = 100000;
     double ransac_threshold = 0.01;
 
     int sor_mean_k = 50;
@@ -169,6 +173,10 @@ public:
         y_max = readParam<double>(nh, "y_max");
         z_min = readParam<double>(nh, "z_min");
         z_max = readParam<double>(nh, "z_max");
+
+        EUCLID_CLUSTERING_TOLERANCE = readParam<double>(nh, "EUCLID_CLUSTERING_TOLERANCE");
+        EUCLID_CLUSTER_MIN_SIZE = readParam<double>(nh, "EUCLID_CLUSTER_MIN_SIZE");
+        EUCLID_CLUSTER_MAX_SIZE = readParam<double>(nh, "EUCLID_CLUSTER_MAX_SIZE");
 
         ransac_threshold = readParam<double>(nh, "ransac_threshold");
 
@@ -264,6 +272,9 @@ public:
             return;
 
         cloudHandler(msg);
+
+        if (lidar_points.size() == 0)
+            return;
 
         runSolver();
     }
@@ -865,13 +876,68 @@ public:
     */
 
 
+    
+    void doEuclideanClustering(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn, 
+                               std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &cloudClustersOut)
+    {
+        ROS_INFO("<< node::doEuclideanClustering >>");
+
+        if ((cloudIn == NULL) || (cloudIn->size() < 100))
+        {
+            ROS_ERROR("<< StairLidarDetection::doEuclideanClustering >> cloudIn is empty");
+        }
+
+        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+        tree->setInputCloud(cloudIn);
+
+        std::vector<pcl::PointIndices> cluster_indices;
+        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+        ec.setClusterTolerance(EUCLID_CLUSTERING_TOLERANCE);
+        ec.setMinClusterSize(EUCLID_CLUSTER_MIN_SIZE);
+        ec.setMaxClusterSize(EUCLID_CLUSTER_MAX_SIZE);
+        ec.setSearchMethod(tree);
+        ec.setInputCloud(cloudIn);
+        ec.extract(cluster_indices);
+
+        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> processedCloudClusters;
+        for (const auto &cluster : cluster_indices)
+        {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+            for (const auto &idx : cluster.indices)
+            {
+                cloud_cluster->push_back((*cloudIn)[idx]);
+            }
+
+            cloud_cluster->header.frame_id = cloudIn->header.frame_id;
+            cloud_cluster->header.stamp = cloudIn->header.stamp;
+
+            processedCloudClusters.push_back(cloud_cluster);
+        }
+
+        cloudClustersOut = processedCloudClusters;
+
+    }
+
+
     void extractChessboardCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr &inputCloud, 
                                 pcl::PointCloud<pcl::PointXYZ>::Ptr &outputCloud)
     {
         ROS_INFO("<< node::extractChessboardCloud >>");
 
-        //--- Create the segmentation object
+        //--- Do Euclidean clustering
+        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusters;
+        doEuclideanClustering(inputCloud, clusters);
+
+        for (auto& plane: clusters)
+            {
+                ROS_WARN("point number: %ld", plane->size());
+            }
+
+        ROS_INFO("Num of clusters: %ld", clusters.size());
+
+        //--- Create the segmentation and extract object
         pcl::SACSegmentation<pcl::PointXYZ> seg;
+        pcl::ExtractIndices<pcl::PointXYZ> extract;
         
         // seg.setOptimizeCoefficients(true);
         seg.setModelType(pcl::SACMODEL_PLANE);
@@ -880,60 +946,78 @@ public:
         seg.setDistanceThreshold(ransac_threshold);
         seg.setNumberOfThreads(2);
 
-        //--- Create the filtering object
-        pcl::PointCloud<pcl::PointXYZ>::Ptr remainingCloud(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::ExtractIndices<pcl::PointXYZ> extract;
-
-        remainingCloud = inputCloud;
-
         std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> detectedPlaneClouds;
 
-        //--- Search for plane clouds
-        while (remainingCloud->points.size() > min_points_on_plane)
+        //--- Find chessboard among all the clusters
+        for (auto& cloud: clusters)
         {
-            // Segment the largest planar component from the remaining cloud
-            pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
-            pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-
-            seg.setInputCloud(remainingCloud);
-            seg.segment(*inliers, *coefficients);   
+            pcl::PointCloud<pcl::PointXYZ>::Ptr remainingCloud(new pcl::PointCloud<pcl::PointXYZ>);
             
-            if (inliers->indices.size() == 0)
+            remainingCloud = cloud;
+
+            //--- Search for plane clouds
+            while (remainingCloud->points.size() > min_points_on_plane)
             {
-                ROS_WARN("Could not estimate a planar model for the given dataset.");
-                break;
-            }
+                // Segment the largest planar component from the remaining cloud
+                pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
+                pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
 
-            // Extract the inliers
-            pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud(new pcl::PointCloud<pcl::PointXYZ>);
-            extract.setInputCloud(remainingCloud);
-            extract.setIndices(inliers);
-            extract.setNegative(false);
-            extract.filter(*planeCloud);
+                seg.setInputCloud(remainingCloud);
+                seg.segment(*inliers, *coefficients);   
+                
+                if (inliers->indices.size() == 0)
+                {
+                    ROS_WARN("Could not estimate a planar model for the given dataset.");
+                    break;
+                }
 
-            planeCloud->header = inputCloud->header;
+                // Extract the inliers
+                pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud(new pcl::PointCloud<pcl::PointXYZ>);
+                extract.setInputCloud(remainingCloud);
+                extract.setIndices(inliers);
+                extract.setNegative(false);
+                extract.filter(*planeCloud);
 
-            // Get remaining cloud
-            pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
+                planeCloud->header = inputCloud->header;
 
-            extract.setNegative(true);
-            extract.filter(*tempCloud);
+                // Get remaining cloud
+                pcl::PointCloud<pcl::PointXYZ>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-            remainingCloud = tempCloud;
+                extract.setNegative(true);
+                extract.filter(*tempCloud);
 
-            // Get plane cloud
-            if ((min_points_on_plane < planeCloud->size()) &&
-                (planeCloud->size() < max_points_on_plane))
-            {
-                detectedPlaneClouds.push_back(planeCloud);                
+                remainingCloud = tempCloud;
+
+                // Get plane cloud
+                if ((min_points_on_plane < planeCloud->size()) &&
+                    (planeCloud->size() < max_points_on_plane))
+                {
+                    detectedPlaneClouds.push_back(planeCloud);                
+                }
             }
         }
 
-        if (detectedPlaneClouds.size() == 1)
+
+        //--- Get results
+        if (detectedPlaneClouds.size() == 0)
+        {
+            ROS_ERROR("There is zero plane !");
+        }
+        else if (detectedPlaneClouds.size() == 1)
+        {
             outputCloud = detectedPlaneClouds[0];
-        else 
-            ROS_ERROR("Couldn't detect chessboard point cloud!");
-        
+            ROS_WARN("Detected plane lidar point number: %ld", outputCloud->size());
+        }
+        else
+        {
+            ROS_ERROR("There are more than 1 planes detected !");
+
+            for (auto& plane: detectedPlaneClouds)
+            {
+                ROS_WARN("Plane lidar point number: %ld", plane->size());
+            }
+        }
+
     }
 
 

@@ -11,8 +11,8 @@
 
   <param name = "camera_name" type="string" value="camera"/>
   
-  <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_front_right.yaml" />
-  <param name = "result_file" type="string" value="$(find camera_calib)/results/C_T_L_dog2_argus_front_right.txt" />
+  <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_intrinsic.yaml" />
+  <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_side_left_C_T_L.txt" />
 
   <param name= "project_only_plane" type="bool" value="false"/>
 
