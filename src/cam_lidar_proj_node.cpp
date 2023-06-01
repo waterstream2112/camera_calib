@@ -109,6 +109,8 @@ private:
 public:
     lidarImageProjection() 
     {
+        ROS_INFO("Start initialization...");
+
         //--- Read params
         std::string topic_input_image_and_cloud = readParam<std::string>(nh, "topic_input_image_and_cloud");
         std::string lidarOutTopic = readParam<std::string>(nh, "topic_output_velodyne_cloud");
@@ -195,6 +197,8 @@ public:
         //--- Publishers
         cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(lidarOutTopic, 1);
         image_pub = nh.advertise<sensor_msgs::Image>(imageOutTopic, 1);
+
+        ROS_INFO("Initialization done !");
 
     }
 
@@ -293,18 +297,14 @@ public:
         } 
         else 
         {
-            // pcl::PCLPointCloud2 *cloud_in = new pcl::PCLPointCloud2;
-            // pcl_conversions::toPCL(cloud_msg, *cloud_in);
-            // pcl::fromPCLPointCloud2(*cloud_in, *in_cloud);
-
             pcl::fromROSMsg(cloud_msg, *in_cloud);
 
             for(size_t i = 0; i < in_cloud->points.size(); i++) 
             {
 
                 // Reject points behind the LiDAR(and also beyond certain distance)
-                if(in_cloud->points[i].x < 0 || in_cloud->points[i].x > cloud_cutoff_distance)
-                    continue;
+                // if(in_cloud->points[i].x < 0 || in_cloud->points[i].x > cloud_cutoff_distance)
+                //     continue;
 
                 Eigen::Vector4d pointCloud_L;
                 pointCloud_L[0] = in_cloud->points[i].x;
