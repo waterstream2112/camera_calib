@@ -12,7 +12,7 @@
   <param name = "camera_name" type="string" value="camera"/>
   
   <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_intrinsic.yaml" />
-  <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_side_left_C_T_L.txt" />
+  <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_rear_C_T_L.txt" />
 
   <param name= "project_only_plane" type="bool" value="false"/>
 

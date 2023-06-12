@@ -6,17 +6,17 @@ checkerboard_rows: 9
 checkerboard_cols: 6
 
 min_points_on_plane: 300
-max_points_on_plane: 1500
+max_points_on_plane: 2000
 
-num_views: 15
+num_views: 10
 num_of_initializations: 1
 
-x_min: -1.0
-x_max: 4.0
-y_min: -2.5
-y_max: 2.5
-z_min: -0.3
-z_max: 2.5
+x_min: -3.0
+x_max: 0.0
+y_min: -1.0
+y_max: 1.0
+z_min: -0.6
+z_max: 2.0
 
 EUCLID_CLUSTERING_TOLERANCE: 0.2
 EUCLID_CLUSTER_MIN_SIZE: 100
