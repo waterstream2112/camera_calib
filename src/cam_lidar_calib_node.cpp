@@ -70,6 +70,7 @@ private:
     // ros::Subscriber imageSub;
     // ros::Subscriber cloudSub;
     ros::Subscriber imageAndCloudSub;
+    ros::Subscriber imagesAndCloudSub;
 
     ros::Publisher filtered_cloud_pub;
     ros::Publisher plane_cloud_pub;
@@ -113,6 +114,7 @@ private:
     std::string camera_in_topic;
     std::string lidar_in_topic;
     std::string image_and_cloud_in_topic;
+    std::string images_and_cloud_in_topic;
 
     int num_views;
 
@@ -134,6 +136,7 @@ public:
         // camera_in_topic = readParam<std::string>(nh, "camera_in_topic");
         // lidar_in_topic = readParam<std::string>(nh, "lidar_in_topic");
         image_and_cloud_in_topic = readParam<std::string>(nh, "image_and_cloud_in_topic");
+        images_and_cloud_in_topic = readParam<std::string>(nh, "images_and_cloud_in_topic");
 
         // cloud_sub = new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, lidar_in_topic, 1);
         // image_sub = new message_filters::Subscriber<sensor_msgs::Image>(nh, camera_in_topic, 1);
@@ -144,6 +147,7 @@ public:
         // imageSub = n.subscribe(camera_in_topic, 5, &camLidarCalib::imageCallback, this);
         // cloudSub = n.subscribe(lidar_in_topic, 5, &camLidarCalib::cloudCallback, this);
         imageAndCloudSub = n.subscribe(image_and_cloud_in_topic, 5, &camLidarCalib::imageAndCloudCallback, this);
+        imagesAndCloudSub = n.subscribe(images_and_cloud_in_topic, 5, &camLidarCalib::imagesAndCloudCallback, this);
 
         samplingDuration = ros::Duration(0.5);  // in sec
         prevCycleTime = ros::Time(1);
@@ -794,6 +798,18 @@ public:
             return;
 
         cloudHandler(msg);
+        runSolver();
+    }
+
+    void imagesAndCloudCallback(const draconis_demo_custom_msgs::ImagesAndPointcloudMsgConstPtr &msg)
+    {
+        // ROS_INFO("Hi");
+        imageHandler(msg->image_left);
+
+        if (!boardDetectedInCam)
+            return;
+
+        cloudHandler(msg->pointcloud);
         runSolver();
     }
 
