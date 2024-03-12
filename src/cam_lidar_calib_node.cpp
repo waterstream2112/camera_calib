@@ -203,7 +203,7 @@ public:
         
         //--- Subscribers
         imageAndCloudSub = n.subscribe(topic_input_image_and_cloud, 5, &camLidarCalib::imageAndCloudCallback, this);
-        imagesAndCloudSub = n.subscribe(topic_input_image_and_cloud, 5, &camLidarCalib::imagesAndCloudCallback, this);
+        imagesAndCloudSub = n.subscribe(topic_input_images_and_cloud, 5, &camLidarCalib::imagesAndCloudCallback, this);
 
 
         //--- Publishers
