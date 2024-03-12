@@ -7,6 +7,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CameraInfo.h>
 #include "draconis_demo_custom_msgs/ImagePointcloudMsg.h"
+#include "draconis_demo_custom_msgs/ImagesAndPointcloudMsg.h"
 
 #include <tf/transform_listener.h>
 #include <image_transport/image_transport.h>
