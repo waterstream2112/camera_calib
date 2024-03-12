@@ -275,7 +275,7 @@ public:
         if (!boardDetectedInCam)
             return;
 
-        cloudHandler(msg);
+        // cloudHandler(msg);
 
         if (lidar_points.size() == 0)
             return;
