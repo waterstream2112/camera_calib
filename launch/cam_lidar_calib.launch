@@ -8,13 +8,14 @@
     <node pkg="camera_calib" name="camera_calib" type="cam_lidar_calib_node" output="screen">
 
       <param name = "topic_input_image_and_cloud" type="string" value="/$(env ROBOT_NAMESPACE)/image_and_cloud"/>
+      <param name = "topic_input_images_and_cloud" type="string" value="/$(env ROBOT_NAMESPACE)/images_and_cloud"/>
       <param name = "topic_output_viz_cloud_1" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_1"/>
       <param name = "topic_output_viz_cloud_2" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_2"/>
       <param name = "topic_output_viz_cloud_3" type="string" value="/$(env ROBOT_NAMESPACE)/viz_cloud_3"/>
 
       <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_intrinsic.yaml" />
-      <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_rear_C_T_L.txt"/>
-      <param name = "result_rpy_file" type="string" value="$(find camera_calib)/results/dog2_argus_rear_rpy_txyz.txt"/>
+      <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_left_C_T_L.txt"/>
+      <param name = "result_rpy_file" type="string" value="$(find camera_calib)/results/dog2_argus_left_rpy_txyz.txt"/>
 
       <!-- <param name = "initializations_file" value="/home/subodh/catkin_ws/src/camera_lidar_calibration/calibration/debug_data/results/methodA/left_vlp/random_init.txt"/> -->
 

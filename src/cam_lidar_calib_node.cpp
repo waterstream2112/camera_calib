@@ -65,6 +65,7 @@ private:
     ros::NodeHandle nh;
 
     ros::Subscriber imageAndCloudSub;
+    ros::Subscriber imagesAndCloudSub;
 
     ros::Publisher vizCloud1Pub, vizCloud2Pub, vizCloud3Pub;
     // ros::Publisher filtered_cloud_pub;
@@ -137,6 +138,7 @@ public:
         //--- Read params
 
         std::string topic_input_image_and_cloud = readParam<std::string>(nh, "topic_input_image_and_cloud");
+        std::string topic_input_images_and_cloud = readParam<std::string>(nh, "topic_input_images_and_cloud");
 
         std::string topic_output_viz_cloud_1 = readParam<std::string>(nh, "topic_output_viz_cloud_1");
         std::string topic_output_viz_cloud_2 = readParam<std::string>(nh, "topic_output_viz_cloud_2");
@@ -200,6 +202,7 @@ public:
         
         //--- Subscribers
         imageAndCloudSub = n.subscribe(topic_input_image_and_cloud, 5, &camLidarCalib::imageAndCloudCallback, this);
+        imagesAndCloudSub = n.subscribe(topic_input_image_and_cloud, 5, &camLidarCalib::imagesAndCloudCallback, this);
 
 
         //--- Publishers
@@ -272,6 +275,24 @@ public:
             return;
 
         cloudHandler(msg);
+
+        if (lidar_points.size() == 0)
+            return;
+
+        runSolver();
+    }
+
+
+    void imagesAndCloudCallback(const draconis_demo_custom_msgs::ImagesAndPointcloudMsgConstPtr &msg)
+    {
+        ROS_INFO("<< node::imageAndCloudCallback >>");
+
+        imageHandler(msg->image_left);
+
+        if (!boardDetectedInCam)
+            return;
+
+        cloudHandler(msg->pointcloud);
 
         if (lidar_points.size() == 0)
             return;
