@@ -293,7 +293,7 @@ public:
         if (!boardDetectedInCam)
             return;
 
-        cloudHandler(msg->pointcloud);
+        cloudHandler(msg);
 
         if (lidar_points.size() == 0)
             return;
@@ -521,7 +521,7 @@ public:
     */
 
 
-    void cloudHandler(const draconis_demo_custom_msgs::ImagePointcloudMsgConstPtr &msg)
+    void cloudHandler(const draconis_demo_custom_msgs::ImagesAndPointcloudMsgConstPtr &msg)
     {
         ROS_INFO("<< node::cloudHandler >>");
 
