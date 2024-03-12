@@ -287,7 +287,7 @@ public:
     {
         ROS_INFO("<< node::imageAndCloudCallback >>");
 
-        imageHandler(msg->image_left);
+        imagesHandler(msg);
 
         if (!boardDetectedInCam)
             return;
@@ -568,6 +568,73 @@ public:
         {
             boost::shared_ptr<void const> tracked_object;
             image_in = cv_bridge::toCvShare(msg->image, tracked_object, "bgr8")->image;
+            boardDetectedInCam = cv::findChessboardCorners(image_in,
+                                                           cv::Size(checkerboard_cols, checkerboard_rows),
+                                                           image_points,
+                                                           cv::CALIB_CB_ADAPTIVE_THRESH+
+                                                           cv::CALIB_CB_NORMALIZE_IMAGE);
+            
+            if(image_points.size() == object_points.size())
+            {
+                cv::solvePnP(object_points, 
+                            image_points, 
+                            projection_matrix, 
+                            distCoeff, 
+                            rvec, 
+                            tvec, 
+                            false, 
+                            cv::SOLVEPNP_ITERATIVE);
+
+                projected_points.clear();
+
+                cv::projectPoints(object_points, 
+                                rvec, 
+                                tvec, 
+                                projection_matrix, 
+                                distCoeff, 
+                                projected_points, 
+                                cv::noArray());
+
+                for(int i = 0; i < projected_points.size(); i++){
+                    cv::circle(image_in, 
+                            projected_points[i], 
+                            3, 
+                            cv::Scalar(0, 255, 0), 
+                            1, 
+                            cv::LINE_AA, 
+                            0);
+                }
+
+                cv::Rodrigues(rvec, C_R_W);
+                cv::cv2eigen(C_R_W, c_R_w);
+
+                c_t_w = Eigen::Vector3d(tvec.at<double>(0),
+                                        tvec.at<double>(1),
+                                        tvec.at<double>(2));
+
+                r3 = c_R_w.block<3,1>(0,2);
+                Nc = (r3.dot(c_t_w))*r3;
+            }
+
+            cv::resize(image_in, image_resized, cv::Size(), 1.0, 1.0);
+            cv::imshow("view", image_resized);
+            cv::waitKey(10);
+
+        } catch (cv_bridge::Exception& e) {
+            ROS_ERROR("Could not convert from '%s' to 'bgr8'.",
+                      msg->image.encoding.c_str());
+        }
+    }
+
+
+    void imagesHandler(const draconis_demo_custom_msgs::ImagesAndPointcloudMsgConstPtr &msg) 
+    {
+        ROS_INFO("<< node::imageHandler >>");
+
+        try 
+        {
+            boost::shared_ptr<void const> tracked_object;
+            image_in = cv_bridge::toCvShare(msg->image_left, tracked_object, "bgr8")->image;
             boardDetectedInCam = cv::findChessboardCorners(image_in,
                                                            cv::Size(checkerboard_cols, checkerboard_rows),
                                                            image_points,
