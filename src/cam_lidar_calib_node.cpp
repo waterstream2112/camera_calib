@@ -635,7 +635,7 @@ public:
         try 
         {
             boost::shared_ptr<void const> tracked_object;
-            image_in = cv_bridge::toCvShare(msg->image_left, tracked_object, "bgr8")->image;
+            image_in = cv_bridge::toCvShare(msg->image_front, tracked_object, "bgr8")->image;
             boardDetectedInCam = cv::findChessboardCorners(image_in,
                                                            cv::Size(checkerboard_cols, checkerboard_rows),
                                                            image_points,
@@ -690,7 +690,7 @@ public:
 
         } catch (cv_bridge::Exception& e) {
             ROS_ERROR("Could not convert from '%s' to 'bgr8'.",
-                      msg->image_left.encoding.c_str());
+                      msg->image_front.encoding.c_str());
         }
     }
 
