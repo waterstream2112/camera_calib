@@ -13,6 +13,7 @@
 #include "sensor_msgs/CameraInfo.h"
 #include "sensor_msgs/Image.h"
 #include "draconis_demo_custom_msgs/ImagePointcloudMsg.h"
+#include "draconis_demo_custom_msgs/ImagesAndPointcloudMsg.h"
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
