@@ -6,13 +6,15 @@
   <param name = "lidar_in_topic" type="string" value="/$(env ROBOT_NAMESPACE)/velodyne_points"/> -->
 
   <param name = "topic_input_image_and_cloud" type="string" value="/$(env ROBOT_NAMESPACE)/image_and_cloud"/>
+  <param name = "topic_input_images_and_cloud" type="string" value="/$(env ROBOT_NAMESPACE)/images_and_cloud"/>
   <param name = "topic_output_velodyne_cloud" type="string" value="/$(env ROBOT_NAMESPACE)/velodyne_cloud"/>
+  <param name = "topic_output_l515_cloud" type="string" value="/$(env ROBOT_NAMESPACE)/l515_cloud"/>
   <param name = "topic_output_projected_image" type="string" value="/$(env ROBOT_NAMESPACE)/projected_image"/>
 
   <param name = "camera_name" type="string" value="camera"/>
   
   <param name = "cam_config_file_path" type="string" value="$(find camera_calib)/config/dog2_argus_intrinsic.yaml" />
-  <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_rear_C_T_L.txt" />
+  <param name = "result_file" type="string" value="$(find camera_calib)/results/dog2_argus_fr_l515_C_T_L.txt" />
 
   <param name= "project_only_plane" type="bool" value="false"/>
 
